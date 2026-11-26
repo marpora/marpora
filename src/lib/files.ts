@@ -1,9 +1,10 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
+import { translator, type Language } from './i18n'
 
 export interface OpenDocument { path: string; text: string; lineEnding: 'lf' | 'crlf'; bom: boolean }
 export const desktop = isTauri()
 
-export async function openDocument(): Promise<OpenDocument | null> {
+export async function openDocument(language: Language = 'en'): Promise<OpenDocument | null> {
   if (desktop) return invoke('open_document')
   return new Promise((resolve, reject) => {
     const input = document.createElement('input')
@@ -13,8 +14,8 @@ export async function openDocument(): Promise<OpenDocument | null> {
       try {
         const file = input.files?.[0]
         if (!file) return resolve(null)
-        if (file.size > 16 * 1024 * 1024) throw new Error('文档超过 16 MB。')
-        const raw = await file.text()
+        if (file.size > 16 * 1024 * 1024) throw new Error(translator(language)('documentTooLarge'))
+        const raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await file.arrayBuffer())
         resolve({ path: file.name, text: raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'), lineEnding: raw.includes('\r\n') ? 'crlf' : 'lf', bom: raw.startsWith('\uFEFF') })
       } catch (cause) { reject(cause) }
     }
@@ -38,7 +39,7 @@ export function download(name: string, text: string, type: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export async function loadTheme(): Promise<string | null> {
+export async function loadTheme(language: Language = 'en'): Promise<string | null> {
   if (desktop) return invoke('open_theme')
   return new Promise((resolve, reject) => {
     const input = document.createElement('input')
@@ -48,7 +49,7 @@ export async function loadTheme(): Promise<string | null> {
       try {
         const file = input.files?.[0]
         if (!file) return resolve(null)
-        if (file.size > 2 * 1024 * 1024) throw new Error('主题超过 2 MB。')
+        if (file.size > 2 * 1024 * 1024) throw new Error(translator(language)('themeTooLarge'))
         resolve(await file.text())
       } catch (cause) { reject(cause) }
     }
@@ -57,7 +58,7 @@ export async function loadTheme(): Promise<string | null> {
   })
 }
 
-export async function resolveImages(frame: HTMLIFrameElement, path: string | null): Promise<void> {
+export async function resolveImages(frame: HTMLIFrameElement, path: string | null, language: Language = 'en'): Promise<void> {
   if (!desktop || !path) return
   const images = Array.from(frame.contentDocument?.querySelectorAll('img, image') || [])
   await Promise.all(images.map(async (image) => {
@@ -67,6 +68,6 @@ export async function resolveImages(frame: HTMLIFrameElement, path: string | nul
     try {
       const data = await invoke<string>('read_image', { documentPath: path, relativePath: decodeURIComponent(src) })
       if (image.isConnected) image.setAttribute(attribute, data)
-    } catch { image.setAttribute('aria-label', `[图片未能加载] ${image.getAttribute('alt') || src}`) }
+    } catch { image.setAttribute('aria-label', `[${translator(language)('imageFailed')}] ${image.getAttribute('alt') || src}`) }
   }))
 }

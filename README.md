@@ -2,7 +2,7 @@
 
 一个轻量、本地优先的 Markdown 与 Marp 桌面工作台。macOS 优先，使用 Tauri 2、Svelte 5、TypeScript、CodeMirror 6 和 Marp Core 5。
 
-![Marpora Markdown 工作区](docs/screenshots/workspace.png)
+![Marpora 原位编辑](docs/screenshots/live-light.png)
 
 ## 运行
 
@@ -17,7 +17,10 @@ npm run desktop
 
 ## 当前原型
 
-- Markdown 源码编辑、语法高亮、自动换行、查找替换、撤销重做。
+- 默认原位编辑：标题、强调、链接、列表与引用即时排版；当前段落恢复 Markdown 标记，表格、代码和图片点击后显示原始源码编辑。
+- 一键切换源码模式（⌘ / Ctrl + /），保留选区与撤销历史；支持语法高亮、自动换行、查找替换。
+- 中英文界面，默认英文；偏好设置中随时切换，原有文档内容不会随界面语言翻译。
+- 浅色、深色及跟随系统外观（默认）；强调色可跟随系统或选择蓝、青、玫瑰、琥珀色。系统强调色取决于 WebView 支持，不支持时使用蓝色。设置保存在本机，幻灯片保持模板配色。
 - 文档实时预览、源码滚动同步；支持表格、代码、链接、HTML 与图片。
 - 自动识别 front matter 中的 `marp: true`；也可以手动选择文档或幻灯片模式。
 - Marp 幻灯片分页、导航、演讲者备注、演示模式与 fragment 逐步显示。
@@ -26,7 +29,7 @@ npm run desktop
 - 系统文件打开/保存/另存为、拖入 Markdown、快捷键、可调整双栏、单栏编辑或预览。
 - 未保存提示与本机草稿恢复。原生保存采用临时文件替换，并在覆盖前检查外部修改，保留 UTF-8 BOM 和 LF/CRLF。
 
-这是源码与预览双栏原型；Typora 式原位编辑、已有 HTML/PDF 文件查看、HTML/PDF 导出、文件树、多文档标签与 Finder 文件关联尚未实现。当前无云端服务或遥测。文档引用的远程图片或 CSS 资源仍可能发起网络请求。
+普通文档默认使用单栏原位编辑；可切换源码及双栏预览，Marp 文件默认双栏显示编辑器与幻灯片。当前复杂表格、代码与图片点击后以源码编辑，尚未提供表格单元格的富文本操作。已有 HTML/PDF 文件查看、HTML/PDF 导出、文件树、多文档标签与 Finder 文件关联尚未实现。当前无云端服务或遥测。文档引用的远程图片或 CSS 资源仍可能发起网络请求。
 
 ## 验证你的 UIC 模板
 
@@ -50,6 +53,7 @@ UIC CSS 与引擎来自 [marp-uic-slides-template](https://github.com/xjtuwxg/ma
 
 | 操作 | macOS | Windows / Linux |
 | --- | --- | --- |
+| 原位 / 源码切换 | ⌘ / | Ctrl / |
 | 新建 | ⌘ N | Ctrl N |
 | 打开 | ⌘ O | Ctrl O |
 | 保存 | ⌘ S | Ctrl S |
@@ -71,7 +75,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run desktop:build -- --bundles app,dmg
 ```
 
-浏览器测试在 macOS 上使用已安装的 Chrome；其他环境先运行 `npx playwright install chromium`。前端测试覆盖真实模板、双栏、fragment、隐藏页、行注释、源码映射和 HTML 清理；浏览器测试覆盖编辑、模板打开/保存往返、演示键盘、未保存保护、撤销隔离与草稿恢复。Rust 测试覆盖磁盘冲突、编码格式和资源路径权限。
+浏览器测试在 macOS 上使用已安装的 Chrome；其他环境先运行 `npx playwright install chromium`。前端测试覆盖真实模板、模式切换无损、局部编辑及撤销、偏好设置、fragment、隐藏页、行注释、源码映射和 HTML 清理；浏览器测试覆盖原位块点击、组合输入事件、整篇删除及撤销、BOM/CRLF 字节往返、原位标题修改后保留 Marp 元数据/自定义指令、双语持久化、系统外观实时变化、模板配色隔离、演示键盘、未保存保护与草稿恢复。组合输入自动化只覆盖浏览器事件流程，实际输入法仍建议在目标系统试用。Rust 测试覆盖磁盘冲突、编码格式和资源路径权限。
 
 macOS 产物在 `src-tauri/target/release/bundle/macos/` 和 `src-tauri/target/release/bundle/dmg/`。当前只在本机验证了 Apple Silicon macOS；本地包使用临时签名，尚未进行 Apple Developer ID 签名、公证或 Windows 签名。
 
@@ -79,6 +83,8 @@ macOS 产物在 `src-tauri/target/release/bundle/macos/` 和 `src-tauri/target/r
 
 ## 实现取舍
 
-CodeMirror 中的文本是唯一真源，预览在 180 ms 停止输入后更新；Marp 和公式模块按需加载。应用不捆绑 Chromium 或 Node.js。预览 HTML 经清理后显示于禁用脚本的 iframe，文件权限留在原生主窗口。
+CodeMirror 中的文本是唯一真源。原位显示由 decorations 和只读 widgets 实现，不从渲染后的 HTML 反向生成 Markdown。front matter、HTML、Marp 指令和行注释保留源码显示；未知指令也不会被清理或重排。切换显示模式只重配扩展，不替换文档或重建撤销历史。独立预览在 180 ms 停止输入后更新；Marp 和公式模块按需加载。应用不捆绑 Chromium 或 Node.js。预览 HTML 经清理后显示于禁用脚本的 iframe，文件权限留在原生主窗口。
 
 目前渲染仍在前端主线程；大文档性能尚未基准测试，后续可以将 Marp 转换移入 Worker。预览区只渲染一张可见幻灯片，但整副牌的 DOM 会保留，适合当前轻量原型规模。
+
+编辑器视图依赖锁定为 `@codemirror/view 6.43.15`，以保留已验证的混合行高行为；升级时请运行段落点击定位与组合输入测试。

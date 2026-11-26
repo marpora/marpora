@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light;
+  --color-paper: #f6f7f9; --color-paper-2: #eef0f4; --color-paper-3: #fefefe;
+  --color-ink: #252b35; --color-ink-2: #3e4653; --color-muted: #646e7e; --color-rule: #dce1e8;
+  --color-accent: #2855c5; --color-accent-soft: #e8eefc; --color-accent-ink: #fefefe; --color-focus: var(--color-accent);
+  --color-editor-line: #f2f5fa; --color-gutter: #646e7e; --color-selection: #d9e5ff;
+  --color-warning: #f9f3e3; --color-warning-ink: #705119; --color-error-paper: #fff0ec; --color-error: #ac332b;
+  --color-presentation: #181e29;
+  --syntax-keyword: #8447ad; --syntax-string: #28734f; --syntax-comment: #727b87; --syntax-number: #98621c;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-paper: #20242c; --color-paper-2: #2b313c; --color-paper-3: #191d24;
+  --color-ink: #e1e6ee; --color-ink-2: #c5cedc; --color-muted: #a4afc0; --color-rule: #3c4554;
+  --color-accent: #92b4ff; --color-accent-soft: #273854; --color-accent-ink: #142440;
+  --color-editor-line: #232c3a; --color-gutter: #a4afc0; --color-selection: #344d74;
+  --color-warning: #3c3322; --color-warning-ink: #e9ce93; --color-error-paper: #3c272a; --color-error: #ffa99c;
+  --syntax-keyword: #d4a7ff; --syntax-string: #91d6aa; --syntax-comment: #a0abba; --syntax-number: #e9c48a;
+}
+:root[data-accent='teal'] { --color-accent: #08796d; --color-accent-soft: #e0f2ee; }
+:root[data-accent='rose'] { --color-accent: #b33062; --color-accent-soft: #f9e8f0; }
+:root[data-accent='amber'] { --color-accent: #8c5e09; --color-accent-soft: #f9efda; }
+:root[data-theme='dark'][data-accent='teal'] { --color-accent: #75d8c5; --color-accent-soft: #203d3b; --color-accent-ink: #12362e; }
+:root[data-theme='dark'][data-accent='rose'] { --color-accent: #ff9dbd; --color-accent-soft: #472d3c; --color-accent-ink: #401b2a; }
+:root[data-theme='dark'][data-accent='amber'] { --color-accent: #efc778; --color-accent-soft: #443820; --color-accent-ink: #35280e; }
+@supports (color: AccentColor) {
+  :root[data-accent='system'] { --color-accent: AccentColor; --color-accent-ink: AccentColorText; --color-accent-soft: color-mix(in srgb, AccentColor 13%, var(--color-paper-3)); }
+}
+@supports (color: -apple-system-control-accent) {
+  :root[data-accent='system'] { --color-accent: -apple-system-control-accent; --color-accent-soft: color-mix(in srgb, var(--color-accent) 13%, var(--color-paper-3)); }
+}

@@ -2,18 +2,29 @@
   import { onMount } from 'svelte'
   import Editor from './components/Editor.svelte'
   import Preview from './components/Preview.svelte'
+  import PreferencesPanel from './components/Preferences.svelte'
+  import { translator, errorMessage } from './lib/i18n'
+  import { loadPreferences, preferencesKey, resolveAppearance } from './lib/preferences'
   import { characterCount, effectiveMode, fileName, slideStarts, type PreviewMode } from './lib/document'
   import { desktop, loadTheme, openDocument, saveDocument, type OpenDocument } from './lib/files'
   import { renderPreview, type RenderedPreview } from './lib/render'
-  import { starterDeck, uic, welcome } from './lib/samples'
+  import { starterDeck, uic, welcome, welcomeEnglish } from './lib/samples'
 
-  let text = $state(welcome)
-  let savedText = $state<string | null>(welcome)
+  const initialPreferences = loadPreferences()
+  let preferences = $state(initialPreferences)
+  let preferencesOpen = $state(false)
+  let systemDark = $state(window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const t = $derived(translator(preferences.language))
+  const scheme = $derived(resolveAppearance(preferences.appearance, systemDark))
+  const initialDocument = initialPreferences.language === 'zh' ? welcome : welcomeEnglish
+  let text = $state(initialDocument)
+  let savedText = $state<string | null>(initialDocument)
   let path = $state<string | null>(null)
-  let label = $state('开始写作.md')
+  let label = $state(translator(initialPreferences.language)('welcomeName'))
   let revision = $state(0)
   let mode = $state<PreviewMode>('auto')
-  let layout = $state<'split' | 'editor' | 'preview'>('split')
+  let layout = $state<'split' | 'editor' | 'preview'>('editor')
+  let editing = $state<'live' | 'source'>('live')
   let line = $state(1)
   let column = $state(1)
   let offset = $state(0)
@@ -52,11 +63,12 @@
     const source = text
     const target = currentMode
     const css = themeCss
+    const language = preferences.language
     const generation = ++renderGeneration
     busy = true
     const timer = setTimeout(async () => {
       try {
-        const next = await renderPreview(source, { mode: target, themeCss: css })
+        const next = await renderPreview(source, { mode: target, themeCss: css, language })
         if (generation !== renderGeneration) return
         result = next
         renderedMode = target
@@ -64,10 +76,26 @@
         step = 0
         error = ''
       } catch (cause) {
-        if (generation === renderGeneration) error = `预览未能更新：${String(cause)}`
+        if (generation === renderGeneration) error = t('previewFailed', { error: errorMessage(cause, preferences.language) })
       } finally { if (generation === renderGeneration) busy = false }
     }, 180)
     return () => clearTimeout(timer)
+  })
+
+  $effect(() => {
+    document.documentElement.lang = preferences.language === 'zh' ? 'zh-CN' : 'en'
+    document.documentElement.dataset.theme = scheme
+    document.documentElement.dataset.accent = preferences.accent
+    try { localStorage.setItem(preferencesKey, JSON.stringify(preferences)) } catch { /* Optional preference storage. */ }
+  })
+
+  $effect(() => {
+    const language = preferences.language
+    const appearance = preferences.appearance
+    if (desktop) {
+      void import('@tauri-apps/api/core').then(({ invoke }) => invoke('set_language', { language }))
+      void import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setTheme(appearance === 'system' ? null : appearance))
+    }
   })
 
   $effect(() => {
@@ -93,9 +121,9 @@
     if (!dirty) return true
     if (desktop) {
       const { ask } = await import('@tauri-apps/plugin-dialog')
-      return ask('当前文档有未保存的修改。要放弃修改吗？', { title: 'Marpora', kind: 'warning', okLabel: '放弃修改', cancelLabel: '继续编辑' })
+      return ask(t('discardQuestion'), { title: 'Marpora', kind: 'warning', okLabel: t('discard'), cancelLabel: t('keepEditing') })
     }
-    return window.confirm('当前文档有未保存的修改。要放弃修改吗？')
+    return window.confirm(t('discardQuestion'))
   }
 
   function applyDocument(source: string, name: string, opened?: OpenDocument) {
@@ -115,6 +143,7 @@
     recovered = false
     error = ''
     mode = 'auto'
+    layout = effectiveMode(source, 'auto') === 'slides' ? 'split' : 'editor'
     try { localStorage.removeItem('marpora.draft.v1') } catch { /* optional storage */ }
   }
 
@@ -123,8 +152,8 @@
     fileBusy = true
     try {
       if (!await confirmDiscard()) return
-      const samples = { welcome, slides: starterDeck, uic, empty: '' }
-      applyDocument(samples[kind], kind === 'uic' ? 'uic-example.md' : kind === 'slides' ? '演示文稿.md' : kind === 'empty' ? '未命名.md' : '开始写作.md')
+      const samples = { welcome: preferences.language === 'zh' ? welcome : welcomeEnglish, slides: starterDeck, uic, empty: '' }
+      applyDocument(samples[kind], kind === 'uic' ? 'uic-example.md' : kind === 'slides' ? t('deckName') : kind === 'empty' ? t('untitled') : t('welcomeName'))
     } finally { fileBusy = false }
   }
 
@@ -132,10 +161,10 @@
     if (fileBusy) return
     fileBusy = true
     try {
-      const opened = await openDocument()
+      const opened = await openDocument(preferences.language)
       if (!opened || !await confirmDiscard()) return
       applyDocument(opened.text, fileName(opened.path), opened)
-    } catch (cause) { error = `打开失败：${String(cause)}` }
+    } catch (cause) { error = t('openFailed', { error: errorMessage(cause, preferences.language) }) }
     finally { fileBusy = false }
   }
 
@@ -152,16 +181,16 @@
       recovered = false
       error = ''
       return true
-    } catch (cause) { error = `保存失败：${String(cause)}`; return false }
+    } catch (cause) { error = t('saveFailed', { error: errorMessage(cause, preferences.language) }); return false }
     finally { fileBusy = false }
   }
 
   async function theme() {
     try {
-      const css = await loadTheme()
-      if (css && !/@theme\s+([\w-]+)/.test(css)) { error = '主题 CSS 需要包含 /* @theme 主题名 */。'; return }
+      const css = await loadTheme(preferences.language)
+      if (css && !/@theme\s+([\w-]+)/.test(css)) { error = t('themeMetadata'); return }
       if (css) themeCss = css
-    } catch (cause) { error = `加载主题失败：${String(cause)}` }
+    } catch (cause) { error = t('themeFailed', { error: errorMessage(cause, preferences.language) }) }
   }
 
   function cursor(nextLine: number, nextColumn: number, nextOffset: number) {
@@ -199,8 +228,10 @@
 
   function keyboard(event: KeyboardEvent) {
     if (event.isComposing) return
+    if (event.key === 'Escape') preferencesOpen = false
     const mod = event.metaKey || event.ctrlKey
-    if (mod && event.key.toLowerCase() === 'o') { event.preventDefault(); void open() }
+    if (mod && event.key === '/') { event.preventDefault(); editing = editing === 'live' ? 'source' : 'live'; if (layout === 'preview') layout = 'editor' }
+    else if (mod && event.key.toLowerCase() === 'o') { event.preventDefault(); void open() }
     else if (mod && event.key.toLowerCase() === 's') { event.preventDefault(); void save(event.shiftKey) }
     else if (mod && event.key.toLowerCase() === 'n') { event.preventDefault(); void sample('empty') }
     else if (event.key === 'Escape' && presenting) { event.preventDefault(); presenting = false; step = Number.MAX_SAFE_INTEGER }
@@ -223,18 +254,21 @@
   }
 
   onMount(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateSystemTheme = () => { systemDark = media.matches }
+    media.addEventListener('change', updateSystemTheme)
     try {
       const draft = JSON.parse(localStorage.getItem('marpora.draft.v1') || 'null')
       if (draft && typeof draft.text === 'string' && draft.dirty) {
         text = draft.text
         savedText = null
-        label = typeof draft.label === 'string' ? draft.label : '恢复的草稿.md'
+        label = typeof draft.label === 'string' ? draft.label : t('recoveredName')
         revision += 1
         recovered = true
       }
     } catch { /* Ignore a damaged optional draft. */ }
     initialized = true
-    if (!desktop) return
+    if (!desktop) return () => media.removeEventListener('change', updateSystemTheme)
     const cleanups: Array<() => void> = []
     let disposed = false
     void (async () => {
@@ -260,15 +294,15 @@
       const drop = await listen<OpenDocument>('document-dropped', async ({ payload }) => {
         if (!fileBusy && await confirmDiscard()) applyDocument(payload.text, fileName(payload.path), payload)
       })
-      const failure = await listen<string>('document-error', ({ payload }) => { error = payload })
+      const failure = await listen<string>('document-error', ({ payload }) => { error = errorMessage(payload, preferences.language) })
       if (disposed) [close, menu, drop, failure].forEach(fn => fn())
       else cleanups.push(close, menu, drop, failure)
     })()
-    return () => { disposed = true; cleanups.forEach(fn => fn()) }
+    return () => { disposed = true; cleanups.forEach(fn => fn()); media.removeEventListener('change', updateSystemTheme) }
   })
 </script>
 
-<svelte:window onkeydown={keyboard} onbeforeunload={beforeUnload} onpointermove={resize} onpointerup={() => dragging = false} />
+<svelte:window onpointerdown={(event) => { if (!(event.target as Element).closest('.preferences-anchor')) preferencesOpen = false }} onkeydown={keyboard} onbeforeunload={beforeUnload} onpointermove={resize} onpointerup={() => dragging = false} />
 
 <div class="app-shell" class:presenting class:resizing={dragging}>
   <header class="toolbar">
@@ -278,69 +312,76 @@
     </div>
     <div class="toolbar-divider"></div>
     <div class="file-actions">
-      <button class="icon-button" title="新建 (⌘ / Ctrl + N)" aria-label="新建文档" disabled={fileBusy} onclick={() => sample('empty')}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
-      <button class="quiet-button" disabled={fileBusy} onclick={open} title="⌘ / Ctrl + O"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 6.5V4h5l2 2h8v10h-15V6.5Z"/></svg>打开</button>
-      <button class="quiet-button" disabled={fileBusy} onclick={() => save()} title="⌘ / Ctrl + S"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h10l3 3v11H3V3h1ZM6 3v5h7V3M6 17v-6h8v6"/></svg>{fileBusy ? '处理中…' : '保存'}</button>
-      <button class="icon-button save-as" title="另存为 (⌘ / Ctrl + Shift + S)" aria-label="另存为" disabled={fileBusy} onclick={() => save(true)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 12v5h12v-5"/></svg></button>
+      <button class="icon-button" title={`${t('new')} (⌘ / Ctrl + N)`} aria-label={t('newDocument')} disabled={fileBusy} onclick={() => sample('empty')}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+      <button class="quiet-button" disabled={fileBusy} onclick={open} title="⌘ / Ctrl + O"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 6.5V4h5l2 2h8v10h-15V6.5Z"/></svg>{t('open')}</button>
+      <button class="quiet-button" disabled={fileBusy} onclick={() => save()} title="⌘ / Ctrl + S"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h10l3 3v11H3V3h1ZM6 3v5h7V3M6 17v-6h8v6"/></svg>{fileBusy ? t('processing') : t('save')}</button>
+      <button class="icon-button save-as" title={`${t('saveAs')} (⌘ / Ctrl + Shift + S)`} aria-label={t('saveAs')} disabled={fileBusy} onclick={() => save(true)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 12v5h12v-5"/></svg></button>
     </div>
-    <div class="document-name" title={path || label}><span>{label}</span>{#if dirty}<span class="unsaved" aria-label="未保存">未保存</span>{/if}</div>
+    <div class="document-name" title={path || label}><span>{label}</span>{#if dirty}<span class="unsaved" aria-label={t('unsaved')}>{t('unsaved')}</span>{/if}</div>
     <div class="toolbar-end">
-      <button class="quiet-button example-button" disabled={fileBusy} onclick={() => sample('uic')}>UIC 示例</button>
-      <div class="layout-controls" aria-label="工作区布局">
-        <button class:active={layout === 'editor'} title="仅编辑" aria-label="仅编辑" aria-pressed={layout === 'editor'} onclick={() => layout = 'editor'}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M6 7h8M6 10h5"/></svg></button>
-        <button class:active={layout === 'split'} title="编辑与预览" aria-label="编辑与预览" aria-pressed={layout === 'split'} onclick={() => layout = 'split'}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M10 4v12"/></svg></button>
-        <button class:active={layout === 'preview'} title="仅预览" aria-label="仅预览" aria-pressed={layout === 'preview'} onclick={() => layout = 'preview'}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg></button>
+      <div class="preferences-anchor">
+        <button class="icon-button" aria-label={t('preferences')} title={t('preferences')} aria-expanded={preferencesOpen} onclick={() => preferencesOpen = !preferencesOpen}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg></button>
+        {#if preferencesOpen}<PreferencesPanel value={preferences} onchange={(value) => preferences = value} onclose={() => preferencesOpen = false}/>{/if}
+      </div>
+      <button class="quiet-button example-button" disabled={fileBusy} onclick={() => sample('uic')}>{t('uicExample')}</button>
+      <div class="layout-controls" aria-label={t('layout')}>
+        <button class:active={layout === 'editor'} title={t('editorOnly')} aria-label={t('editorOnly')} aria-pressed={layout === 'editor'} onclick={() => layout = 'editor'}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M6 7h8M6 10h5"/></svg></button>
+        <button class:active={layout === 'split'} title={t('splitView')} aria-label={t('splitView')} aria-pressed={layout === 'split'} onclick={() => layout = 'split'}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M10 4v12"/></svg></button>
+        <button class:active={layout === 'preview'} title={t('previewOnly')} aria-label={t('previewOnly')} aria-pressed={layout === 'preview'} onclick={() => layout = 'preview'}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg></button>
       </div>
     </div>
   </header>
 
   {#if recovered}
-    <div class="notice" role="status">已恢复未保存的草稿。保存时请选择文件位置。<button onclick={() => recovered = false} aria-label="关闭草稿提示">关闭</button></div>
+    <div class="notice" role="status">{t('restored')}<button onclick={() => recovered = false} aria-label={t('closeDraft')}>{t('close')}</button></div>
   {/if}
   {#if error}
-    <div class="notice error" role="alert"><span>{error}</span><button onclick={() => error = ''} aria-label="关闭错误提示">关闭</button></div>
+    <div class="notice error" role="alert"><span>{error}</span><button onclick={() => error = ''} aria-label={t('closeError')}>{t('close')}</button></div>
   {:else if result.warning}
     <div class="notice" role="status">{result.warning}</div>
   {/if}
 
   <div class="workspace" bind:this={workspace} class:editor-only={layout === 'editor'} class:preview-only={layout === 'preview'} style:--split={`${split}%`}>
-    <section class="editor-pane" aria-label="源码">
+    <section class="editor-pane" aria-label={t('source')}>
       <div class="pane-heading">
-        <span class="pane-label"><span class="source-mark" aria-hidden="true">#</span>Markdown</span>
-        <div class="pane-tools"><button class:enabled={wrap} aria-pressed={wrap} onclick={() => wrap = !wrap} title="切换自动换行">自动换行</button><span class="file-extension">.md</span></div>
+        <div class="mode-switch editing-switch" aria-label={t('editor')}>
+          <button class:active={editing === 'live'} aria-pressed={editing === 'live'} onclick={() => editing = 'live'}>{t('live')}</button>
+          <button class:active={editing === 'source'} aria-pressed={editing === 'source'} title="⌘ / Ctrl + /" onclick={() => editing = 'source'}>{t('source')}</button>
+        </div>
+        <div class="pane-tools"><button class:enabled={wrap} aria-pressed={wrap} onclick={() => wrap = !wrap} title={t('toggleWrap')}>{t('wrap')}</button><span class="file-extension">.md</span></div>
       </div>
-      <Editor bind:this={editor} value={text} {revision} {wrap} onedit={(nextText) => text = nextText} oncursor={cursor} onscroll={(value) => progress = value}/>
+      <Editor bind:this={editor} value={text} {revision} {wrap} language={preferences.language} {editing} {path} onedit={(nextText) => text = nextText} oncursor={cursor} onscroll={(value) => progress = value}/>
     </section>
 
-    <button class="splitter" aria-label="调整编辑区宽度" title="拖动调整宽度；方向键微调" onpointerdown={(event) => { dragging = true; event.currentTarget.setPointerCapture(event.pointerId) }} onkeydown={(event) => { if (event.key === 'ArrowLeft') split = Math.max(25, split - 2); if (event.key === 'ArrowRight') split = Math.min(75, split + 2) }}></button>
+    <button class="splitter" aria-label={t('resize')} title={t('resizeHint')} onpointerdown={(event) => { dragging = true; event.currentTarget.setPointerCapture(event.pointerId) }} onkeydown={(event) => { if (event.key === 'ArrowLeft') split = Math.max(25, split - 2); if (event.key === 'ArrowRight') split = Math.min(75, split + 2) }}></button>
 
-    <section class="preview-pane" aria-label="预览">
+    <section class="preview-pane" aria-label={t('preview')}>
       <div class="pane-heading preview-heading">
-        <div class="mode-switch" aria-label="预览模式">
-          <button class:active={mode === 'auto'} aria-pressed={mode === 'auto'} onclick={() => mode = 'auto'}>自动</button>
-          <button class:active={mode === 'document'} aria-pressed={mode === 'document'} onclick={() => mode = 'document'}>文档</button>
-          <button class:active={mode === 'slides'} aria-pressed={mode === 'slides'} onclick={() => mode = 'slides'}>幻灯片</button>
+        <div class="mode-switch" aria-label={t('previewMode')}>
+          <button class:active={mode === 'auto'} aria-pressed={mode === 'auto'} onclick={() => mode = 'auto'}>{t('auto')}</button>
+          <button class:active={mode === 'document'} aria-pressed={mode === 'document'} onclick={() => mode = 'document'}>{t('document')}</button>
+          <button class:active={mode === 'slides'} aria-pressed={mode === 'slides'} onclick={() => mode = 'slides'}>{t('slides')}</button>
         </div>
         <div class="pane-tools">
-          {#if currentMode === 'slides'}<button onclick={theme} title="导入含 @theme 的 Marp CSS">加载主题</button>{/if}
-          <span class="render-status" aria-live="polite">{busy ? '渲染中…' : currentMode === 'slides' ? 'Marp' : '实时预览'}</span>
+          {#if currentMode === 'slides'}<button onclick={theme} title={t('themeHint')}>{t('loadTheme')}</button>{/if}
+          <span class="render-status" aria-live="polite">{busy ? t('rendering') : currentMode === 'slides' ? 'Marp' : t('realtime')}</span>
         </div>
       </div>
 
       <div class="preview-content">
         {#if currentMode === 'slides'}
-          <div class="deck-heading"><span>{result.theme}</span><button class="quiet-button" onclick={togglePresentation} disabled={slideCount === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z"/></svg>演示</button></div>
+          <div class="deck-heading"><span>{result.theme}</span><button class="quiet-button" onclick={togglePresentation} disabled={slideCount === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z"/></svg>{t('present')}</button></div>
         {/if}
-        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={presenting ? step : Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={keyboard}/>
+        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={presenting ? step : Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={keyboard} language={preferences.language} {scheme} accent={preferences.accent}/>
         {#if currentMode === 'slides'}
           <div class="slide-navigation">
-            <button class="icon-button" aria-label="上一张幻灯片" onclick={previous} disabled={slide === 0 && step === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>
+            <button class="icon-button" aria-label={t('previousSlide')} onclick={previous} disabled={slide === 0 && step === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>
             <span data-testid="slide-counter">{slideCount ? slide + 1 : 0}<span class="counter-separator">/</span>{slideCount}</span>
-            <button class="icon-button" aria-label="下一张幻灯片" onclick={next} disabled={slide >= slideCount - 1 && (!presenting || step >= (preview?.fragmentCount() || 0))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
-            <button class="notes-toggle" class:enabled={showNotes} aria-pressed={showNotes} onclick={() => showNotes = !showNotes}>备注</button>
+            <button class="icon-button" aria-label={t('nextSlide')} onclick={next} disabled={slide >= slideCount - 1 && (!presenting || step >= (preview?.fragmentCount() || 0))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
+            <button class="notes-toggle" class:enabled={showNotes} aria-pressed={showNotes} onclick={() => showNotes = !showNotes}>{t('notes')}</button>
           </div>
-          {#if showNotes}<div class="speaker-notes"><span>演讲者备注</span><p>{notes || '这一页没有备注。'}</p></div>{/if}
-          <nav class="slide-strip" aria-label="幻灯片导航">
+          {#if showNotes}<div class="speaker-notes"><span>{t('speakerNotes')}</span><p>{notes || t('noNotes')}</p></div>{/if}
+          <nav class="slide-strip" aria-label={t('slideNavigation')}>
             {#each result.titles as title, index}<button class:current={slide === index} aria-current={slide === index ? 'page' : undefined} onclick={() => go(index)} title={title}><span class="slide-index">{String(index + 1).padStart(2, '0')}</span><span class="slide-title">{title}</span></button>{/each}
           </nav>
         {/if}
@@ -349,9 +390,9 @@
   </div>
 
   <footer class="statusbar">
-    <div><span>{characters.toLocaleString()} 字符</span><span class="cursor-position">行 {line}，列 {column}</span></div>
-    <div class="statusbar-center">{presenting ? '方向键翻页，空格逐步显示，Esc 退出' : currentMode === 'slides' ? `${slideCount} 张幻灯片` : '本地写作，自由呈现'}</div>
-    <div><button class:enabled={sync} aria-pressed={sync} onclick={() => sync = !sync} title={currentMode === 'slides' ? '随编辑光标切换幻灯片' : '跟随源码滚动'}>{sync ? '同步已开' : '同步已关'}</button><span>UTF-8{bom ? ' BOM' : ''}</span><span>{lineEnding.toUpperCase()}</span></div>
+    <div><span>{t('characters', { count: characters.toLocaleString(preferences.language) })}</span><span class="cursor-position">{t('cursor', { line, column })}</span></div>
+    <div class="statusbar-center">{presenting ? t('presentationHint') : currentMode === 'slides' ? t('slideCount', { count: slideCount }) : t('localWriting')}</div>
+    <div><button class:enabled={sync} aria-pressed={sync} onclick={() => sync = !sync} title={currentMode === 'slides' ? t('syncSlides') : t('syncScroll')}>{sync ? t('syncOn') : t('syncOff')}</button><span>UTF-8{bom ? ' BOM' : ''}</span><span>{lineEnding.toUpperCase()}</span></div>
   </footer>
-  {#if presenting}<button class="exit-presentation" onclick={togglePresentation}>退出演示 <kbd>Esc</kbd></button>{/if}
+  {#if presenting}<button class="exit-presentation" onclick={togglePresentation}>{t('exitPresentation')} <kbd>Esc</kbd></button>{/if}
 </div>

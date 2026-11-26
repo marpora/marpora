@@ -31,10 +31,7 @@ struct OpenDocument {
 fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() > limit {
-        return Err(format!(
-            "文件不是普通文件，或超过 {} MB。",
-            limit / 1024 / 1024
-        ));
+        return Err("MAR_PORA:invalidFile".to_string());
     }
     fs::read(path).map_err(|e| e.to_string())
 }
@@ -47,10 +44,10 @@ fn decode_document(path: &Path) -> Result<OpenDocument, String> {
         .unwrap_or("")
         .to_lowercase();
     if !["md", "markdown", "mdown", "txt"].contains(&extension.as_str()) {
-        return Err("请打开 Markdown 或 UTF-8 文本文件。".into());
+        return Err("MAR_PORA:markdownOnly".into());
     }
     let raw = String::from_utf8(read_limited(&path, MAX_DOCUMENT)?)
-        .map_err(|_| "文件不是 UTF-8 编码，请先将其转换为 UTF-8。".to_string())?;
+        .map_err(|_| "MAR_PORA:badEncoding".to_string())?;
     Ok(OpenDocument {
         path: path.to_string_lossy().into_owned(),
         text: raw.trim_start_matches('\u{feff}').replace("\r\n", "\n"),
@@ -72,7 +69,7 @@ fn require_grant(documents: &Documents, path: &Path) -> Result<PathBuf, String> 
         .map_err(|e| e.to_string())?
         .contains(&canonical)
     {
-        return Err("请先通过打开对话框选择这个文件。".into());
+        return Err("MAR_PORA:grantRequired".into());
     }
     Ok(canonical)
 }
@@ -109,15 +106,15 @@ fn write_document(
     bom: bool,
 ) -> Result<(), String> {
     if text.len() as u64 > MAX_DOCUMENT {
-        return Err("文档超过 16 MB，无法保存。".into());
+        return Err("MAR_PORA:documentTooLarge".into());
     }
     if let Some(expected) = expected {
         let disk = decode_document(path)?;
         if disk.text != expected {
-            return Err("磁盘文件已被其他程序修改。请另存为，或重新打开文件后合并修改。".into());
+            return Err("MAR_PORA:diskConflict".into());
         }
     }
-    let parent = path.parent().ok_or("无法确定保存目录。")?;
+    let parent = path.parent().ok_or("MAR_PORA:badDirectory")?;
     let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
     if let Ok(metadata) = fs::metadata(path) {
         temporary
@@ -159,7 +156,7 @@ async fn save_document(
         let (destination, expected) = if let Some(path) = path {
             let destination = require_grant(&documents, Path::new(&path))?;
             if expected.is_none() {
-                return Err("缺少磁盘版本信息，请使用另存为。".into());
+                return Err("MAR_PORA:missingVersion".into());
             }
             (destination, expected)
         } else {
@@ -211,14 +208,14 @@ fn image_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
     let relative_path = relative_path.split(['?', '#']).next().unwrap_or("");
     let relative = Path::new(relative_path);
     if relative.is_absolute() {
-        return Err("仅支持文档目录内的相对图片。".into());
+        return Err("MAR_PORA:relativeImage".into());
     }
     let canonical = root
         .join(relative)
         .canonicalize()
         .map_err(|e| e.to_string())?;
     if !canonical.starts_with(root) {
-        return Err("图片路径超出文档目录。".into());
+        return Err("MAR_PORA:imageOutside".into());
     }
     Ok(canonical)
 }
@@ -232,7 +229,7 @@ async fn read_image(
     let documents = documents.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let document = require_grant(&documents, Path::new(&document_path))?;
-        let root = document.parent().ok_or("无法确定文档目录。")?;
+        let root = document.parent().ok_or("MAR_PORA:badDirectory")?;
         let image = image_path(root, &relative_path)?;
         let ext = image
             .extension()
@@ -246,13 +243,106 @@ async fn read_image(
             "webp" => "image/webp",
             "avif" => "image/avif",
             "svg" => "image/svg+xml",
-            _ => return Err("不支持的图片格式。".into()),
+            _ => return Err("MAR_PORA:unsupportedImage".into()),
         };
         let bytes = read_limited(&image, MAX_IMAGE)?;
         Ok(format!("data:{};base64,{}", mime, STANDARD.encode(bytes)))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+fn build_menu(app: &tauri::AppHandle, language: &str) -> tauri::Result<Menu<tauri::Wry>> {
+    let label = |en: &'static str, zh: &'static str| if language == "zh" { zh } else { en };
+    let new = MenuItem::with_id(app, "new", label("New", "新建"), true, Some("CmdOrCtrl+N"))?;
+    let open = MenuItem::with_id(
+        app,
+        "open",
+        label("Open…", "打开…"),
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
+    let save = MenuItem::with_id(
+        app,
+        "save",
+        label("Save", "保存"),
+        true,
+        Some("CmdOrCtrl+S"),
+    )?;
+    let save_as = MenuItem::with_id(
+        app,
+        "save-as",
+        label("Save as…", "另存为…"),
+        true,
+        Some("CmdOrCtrl+Shift+S"),
+    )?;
+    let quit = MenuItem::with_id(
+        app,
+        "quit",
+        label("Quit Marpora", "退出 Marpora"),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
+    #[cfg(target_os = "macos")]
+    let application = Submenu::with_items(
+        app,
+        "Marpora",
+        true,
+        &[
+            &PredefinedMenuItem::about(app, Some(label("About Marpora", "关于 Marpora")), None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, Some(label("Hide Marpora", "隐藏 Marpora")))?,
+            &PredefinedMenuItem::hide_others(app, Some(label("Hide Others", "隐藏其他")))?,
+            &PredefinedMenuItem::show_all(app, Some(label("Show All", "显示全部")))?,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
+    #[cfg(not(target_os = "macos"))]
+    let application = Submenu::with_items(
+        app,
+        "Marpora",
+        true,
+        &[
+            &PredefinedMenuItem::about(app, Some(label("About Marpora", "关于 Marpora")), None)?,
+            &quit,
+        ],
+    )?;
+    let file = Submenu::with_items(
+        app,
+        label("File", "文件"),
+        true,
+        &[
+            &new,
+            &open,
+            &save,
+            &save_as,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, Some(label("Close Window", "关闭窗口")))?,
+        ],
+    )?;
+    let edit = Submenu::with_items(
+        app,
+        label("Edit", "编辑"),
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, Some(label("Undo", "撤销")))?,
+            &PredefinedMenuItem::redo(app, Some(label("Redo", "重做")))?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, Some(label("Cut", "剪切")))?,
+            &PredefinedMenuItem::copy(app, Some(label("Copy", "复制")))?,
+            &PredefinedMenuItem::paste(app, Some(label("Paste", "粘贴")))?,
+            &PredefinedMenuItem::select_all(app, Some(label("Select All", "全选")))?,
+        ],
+    )?;
+    Menu::with_items(app, &[&application, &file, &edit])
+}
+
+#[tauri::command]
+fn set_language(app: tauri::AppHandle, language: String) -> Result<(), String> {
+    let menu = build_menu(&app, &language).map_err(|error| error.to_string())?;
+    app.set_menu(menu).map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 pub fn run() {
@@ -263,69 +353,10 @@ pub fn run() {
             open_document,
             save_document,
             open_theme,
-            read_image
+            read_image,
+            set_language
         ])
-        .menu(|app| {
-            let new = MenuItem::with_id(app, "new", "新建", true, Some("CmdOrCtrl+N"))?;
-            let open = MenuItem::with_id(app, "open", "打开…", true, Some("CmdOrCtrl+O"))?;
-            let save = MenuItem::with_id(app, "save", "保存", true, Some("CmdOrCtrl+S"))?;
-            let save_as =
-                MenuItem::with_id(app, "save-as", "另存为…", true, Some("CmdOrCtrl+Shift+S"))?;
-            let quit = MenuItem::with_id(app, "quit", "退出 Marpora", true, Some("CmdOrCtrl+Q"))?;
-            #[cfg(target_os = "macos")]
-            let application = Submenu::with_items(
-                app,
-                "Marpora",
-                true,
-                &[
-                    &PredefinedMenuItem::about(app, Some("关于 Marpora"), None)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::hide(app, Some("隐藏 Marpora"))?,
-                    &PredefinedMenuItem::hide_others(app, Some("隐藏其他"))?,
-                    &PredefinedMenuItem::show_all(app, Some("显示全部"))?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &quit,
-                ],
-            )?;
-            #[cfg(not(target_os = "macos"))]
-            let application = Submenu::with_items(
-                app,
-                "Marpora",
-                true,
-                &[
-                    &PredefinedMenuItem::about(app, Some("关于 Marpora"), None)?,
-                    &quit,
-                ],
-            )?;
-            let file = Submenu::with_items(
-                app,
-                "文件",
-                true,
-                &[
-                    &new,
-                    &open,
-                    &save,
-                    &save_as,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::close_window(app, Some("关闭窗口"))?,
-                ],
-            )?;
-            let edit = Submenu::with_items(
-                app,
-                "编辑",
-                true,
-                &[
-                    &PredefinedMenuItem::undo(app, Some("撤销"))?,
-                    &PredefinedMenuItem::redo(app, Some("重做"))?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::cut(app, Some("剪切"))?,
-                    &PredefinedMenuItem::copy(app, Some("复制"))?,
-                    &PredefinedMenuItem::paste(app, Some("粘贴"))?,
-                    &PredefinedMenuItem::select_all(app, Some("全选"))?,
-                ],
-            )?;
-            Menu::with_items(app, &[&application, &file, &edit])
-        })
+        .menu(|app| build_menu(app, "en"))
         .on_menu_event(|app, event| {
             let _ = app.emit("menu-action", event.id().as_ref());
         })

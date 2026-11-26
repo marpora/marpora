@@ -47,7 +47,7 @@ export function slideStarts(source: string): number[] {
 }
 
 export function fileName(path: string | null): string {
-  return path?.split(/[\\/]/).pop() || '未命名.md'
+  return path?.split(/[\\/]/).pop() || 'Untitled.md'
 }
 
 export function characterCount(source: string): number {

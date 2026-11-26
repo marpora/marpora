@@ -1,22 +1,28 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+
+async function sourceWorkspace(page: Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Source', exact: true }).click()
+  await page.getByRole('button', { name: 'Editor and preview', exact: true }).click()
+}
 
 test('Markdown edits preview live and keep undo history', async ({ page }) => {
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
-  await page.goto('/')
+  await sourceWorkspace(page)
   const preview = page.frameLocator('iframe')
-  await expect(preview.locator('h1')).toHaveText('留一点空间，给思考。')
+  await expect(preview.locator('h1')).toHaveText('Room to think.')
   const editorBounds = await page.locator('.cm-editor').boundingBox()
   const footerBounds = await page.locator('.statusbar').boundingBox()
   expect(editorBounds!.y + editorBounds!.height).toBeLessThanOrEqual(footerBounds!.y + 1)
   await expect(page.locator('.cm-scroller')).toHaveJSProperty('clientHeight', Math.round(editorBounds!.height))
   await page.screenshot({ path: 'docs/screenshots/workspace.png' })
-  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' })
+  const editor = page.getByRole('textbox', { name: 'Markdown editor' })
   await editor.fill('# 中文编辑验证\n\n**实时预览**\n\n| A | B |\n|---|---|\n| 1 | 2 |')
   await expect(preview.locator('h1')).toHaveText('中文编辑验证')
   await expect(preview.locator('table')).toBeVisible()
-  await expect(page.getByLabel('未保存', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Unsaved', { exact: true })).toBeVisible()
   await page.screenshot({ path: 'test-results/markdown.png' })
   expect(failures).toEqual([])
 })
@@ -24,16 +30,16 @@ test('Markdown edits preview live and keep undo history', async ({ page }) => {
 test('UIC template renders and supports slide navigation and presentation fragments', async ({ page }) => {
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
-  await page.goto('/')
-  await page.getByRole('button', { name: 'UIC 示例', exact: true }).click()
+  await sourceWorkspace(page)
+  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
   const preview = page.frameLocator('iframe')
   await expect(preview.locator('svg.current section.title')).toBeVisible()
-  await page.getByRole('button', { name: '下一张幻灯片' }).click()
+  await page.getByRole('button', { name: 'Next slide' }).click()
   await expect(page.getByTestId('slide-counter')).toHaveText('2/10')
   await expect(preview.locator('svg.current h2')).toHaveText("Today's plan")
   await page.getByRole('button', { name: '06 Code, then', exact: false }).click()
-  await page.getByRole('button', { name: '演示', exact: true }).click()
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
   await expect(preview.locator('svg.current .unrevealed')).toHaveCount(2)
   await preview.locator('svg.current h2').click()
   await page.keyboard.press('Space')
@@ -46,8 +52,8 @@ test('UIC template renders and supports slide navigation and presentation fragme
 })
 
 test('recovers an unsaved draft and renders formula assets', async ({ page }) => {
-  await page.goto('/')
-  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' })
+  await sourceWorkspace(page)
+  const editor = page.getByRole('textbox', { name: 'Markdown editor' })
   await editor.fill('---\nmarp: true\n---\n# Formula\n\n$$E = mc^2$$')
   const preview = page.frameLocator('iframe')
   await expect(preview.locator('.katex')).toBeVisible()
@@ -56,19 +62,19 @@ test('recovers an unsaved draft and renders formula assets', async ({ page }) =>
   await page.waitForFunction(() => localStorage.getItem('marpora.draft.v1')?.includes('Formula'))
   page.once('dialog', dialog => dialog.accept())
   await page.reload()
-  await expect(page.getByRole('status')).toContainText('已恢复')
+  await expect(page.getByRole('status')).toContainText('Unsaved draft restored')
   await expect(editor).toContainText('Formula')
 })
 
 test('opens the user template unchanged and offers download/save', async ({ page }) => {
-  await page.goto('/')
+  await sourceWorkspace(page)
   const source = readFileSync(new URL('../../examples/uic/example.md', import.meta.url), 'utf8')
   const chooser = page.waitForEvent('filechooser')
-  await page.getByRole('button', { name: '打开', exact: true }).click()
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
   await (await chooser).setFiles({ name: 'example.md', mimeType: 'text/markdown', buffer: Buffer.from(source) })
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   const file = await download
   const stream = await file.createReadStream()
   const chunks: Buffer[] = []
@@ -77,14 +83,14 @@ test('opens the user template unchanged and offers download/save', async ({ page
 })
 
 test('switching documents resets history and guards unsaved changes', async ({ page }) => {
-  await page.goto('/')
-  const editor = page.getByRole('textbox', { name: 'Markdown 编辑器' })
+  await sourceWorkspace(page)
+  const editor = page.getByRole('textbox', { name: 'Markdown editor' })
   await editor.fill('# draft to preserve')
   page.once('dialog', dialog => dialog.dismiss())
-  await page.getByRole('button', { name: 'UIC 示例', exact: true }).click()
+  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
   await expect(editor).toHaveText('# draft to preserve')
   page.once('dialog', dialog => dialog.accept())
-  await page.getByRole('button', { name: 'UIC 示例', exact: true }).click()
+  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
   await editor.click()
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')

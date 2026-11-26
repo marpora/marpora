@@ -2,16 +2,26 @@
   import { tick } from 'svelte'
   import { previewDocument, type RenderedPreview } from '../lib/render'
   import { resolveImages } from '../lib/files'
+  import { translator, type Language } from '../lib/i18n'
+  import type { Accent } from '../lib/preferences'
 
-  let { result, mode, slide, step, path, progress, sync, onkey }: {
+  let { result, mode, slide, step, path, progress, sync, onkey, language = 'en', scheme = 'light', accent = 'system' }: {
     result: RenderedPreview; mode: 'document' | 'slides'; slide: number; step: number;
     path: string | null; progress: number; sync: boolean;
     onkey: (event: KeyboardEvent) => void;
+    language?: Language; scheme?: 'light' | 'dark'; accent?: Accent;
   } = $props()
   let frame = $state<HTMLIFrameElement>()
   let ready = $state(0)
   let count = $derived(result.titles.length)
   const doc = $derived(previewDocument(result, mode))
+  const t = $derived(translator(language))
+
+  $effect(() => {
+    void ready
+    const root = frame?.contentDocument?.documentElement
+    if (root) { root.lang = language; root.dataset.theme = scheme; root.dataset.accent = accent }
+  })
 
   function updateSlide() {
     const root = frame?.contentDocument
@@ -29,7 +39,7 @@
     ready += 1
     updateSlide()
     if (!frame) return
-    await resolveImages(frame, path)
+    await resolveImages(frame, path, language)
     const content = frame.contentDocument
     content?.addEventListener('keydown', onkey)
     // Keep authored links from navigating the editor or invoking OS protocols.
@@ -64,9 +74,9 @@
 
 <div class:slide-stage={mode === 'slides'} class="preview-frame-wrap" data-testid="preview-surface">
   {#if mode === 'slides' && count === 0}
-    <div class="empty-preview"><h2>没有可显示的幻灯片</h2><p>检查隐藏标记，或添加一些内容。</p></div>
+    <div class="empty-preview"><h2>{t('emptySlides')}</h2><p>{t('emptySlidesHint')}</p></div>
   {:else}
     <!-- Scripts stay disabled; same-origin access is only for navigation and scaling. -->
-    <iframe bind:this={frame} title={mode === 'slides' ? 'Marp 幻灯片预览' : 'Markdown 实时预览'} sandbox="allow-same-origin" srcdoc={doc} onload={loaded} class:slide-frame={mode === 'slides'} style:--slide-ratio={result.aspectRatio || 16 / 9}></iframe>
+    <iframe bind:this={frame} title={mode === 'slides' ? t('slidePreview') : t('documentPreview')} sandbox="allow-same-origin" srcdoc={doc} onload={loaded} class:slide-frame={mode === 'slides'} style:--slide-ratio={result.aspectRatio || 16 / 9}></iframe>
   {/if}
 </div>

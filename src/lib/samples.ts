@@ -1,5 +1,42 @@
 import uicExample from '../../examples/uic/example.md?raw'
 
+export const welcomeEnglish = `# Room to think.
+
+Welcome to **Marpora**. A quiet place for Markdown, with your next presentation just a page away.
+
+Write here. Headings, emphasis, code, tables, and images appear as you move between paragraphs. Click a rendered block to edit its original Markdown.
+
+## Your words, your files
+
+- **Live preview** keeps the page readable while you write.
+- **Source mode** reveals every character with ⌘ / Ctrl + /.
+- **Local files** stay on your computer, in plain Markdown.
+
+> A little less friction. A little more room for the idea.
+
+## Writing becomes a presentation
+
+Open the **UIC example** to try a Marp slide deck with a custom theme, speaker notes, and step-by-step reveals.
+
+\`\`\`typescript
+const idea = 'A little less friction.'
+const marpora = { markdown: true, slides: true }
+\`\`\`
+
+## A few useful shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| Open a file | ⌘ / Ctrl + O |
+| Save | ⌘ / Ctrl + S |
+| Source mode | ⌘ / Ctrl + / |
+| Find | ⌘ / Ctrl + F |
+
+---
+
+Start here. Write down the thought you want to keep.
+`
+
 export const welcome = `# 留一点空间，给思考。
 
 欢迎来到 **Marpora**。一个安静的 Markdown 工作台，也是一张随时可以开始的幻灯片。
