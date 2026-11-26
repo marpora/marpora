@@ -1,0 +1,22 @@
+name: Bug report / 问题反馈
+description: Report an editor, preview, export or file issue.
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened? / 发生了什么？
+      description: Include steps, expected behavior and actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS, architecture and Marpora version / 系统、架构和版本
+      placeholder: macOS 15, Apple Silicon, prototype commit…
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal sample / 最小示例
+      description: Attach or paste a small Markdown sample and theme if relevant. Remove private content first.

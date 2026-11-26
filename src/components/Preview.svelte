@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { tick, onMount } from 'svelte'
   import { previewDocument, type RenderedPreview } from '../lib/render'
   import { resolveImages } from '../lib/files'
   import { translator, type Language } from '../lib/i18n'
@@ -13,6 +13,20 @@
   } = $props()
   let frame = $state<HTMLIFrameElement>()
   let ready = $state(0)
+  let polyfill: Array<(options: { target: ParentNode }) => void> = []
+  function fixScale() { const target = frame?.contentDocument; if (target && mode === 'slides') polyfill.forEach(apply => apply({ target })) }
+  onMount(() => {
+    let disposed = false
+    const observer = new ResizeObserver(() => fixScale())
+    void import('@marp-team/marpit-svg-polyfill').then(async ({ polyfills }) => {
+      const required = await polyfills()
+      if (!disposed) { polyfill = required; fixScale() }
+    })
+    const watch = () => { observer.disconnect(); if (frame) observer.observe(frame) }
+    watchFrame = watch; watch()
+    return () => { disposed = true; observer.disconnect() }
+  })
+  let watchFrame = () => {}
   let count = $derived(result.titles.length)
   const doc = $derived(previewDocument(result, mode))
   const t = $derived(translator(language))
@@ -33,10 +47,12 @@
         fragment.classList.toggle('unrevealed', Number(fragment.getAttribute('data-marpit-fragment')) > step)
       })
     })
+    fixScale()
   }
 
   async function loaded() {
     ready += 1
+    watchFrame()
     updateSlide()
     if (!frame) return
     await resolveImages(frame, path, language)

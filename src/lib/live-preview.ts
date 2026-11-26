@@ -146,7 +146,7 @@ class RenderedBlock extends WidgetType {
         image.onerror = () => { image.title = t('imageFailed'); view.requestMeasure() }
         const source = image.getAttribute('src')
         if (desktop && this.options.path && source && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(source)) {
-          void invoke<string>('read_image', { documentPath: this.options.path, relativePath: decodeURIComponent(source) }).then(url => { if (image.isConnected) image.src = url }).catch(() => { image.title = t('imageFailed') })
+          void invoke<string>('read_resource', { documentPath: this.options.path, relativePath: decodeURIComponent(source) }).then(url => { if (image.isConnected) image.src = url }).catch(() => { image.title = t('imageFailed') })
         }
       })
     }

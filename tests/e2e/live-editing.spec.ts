@@ -124,7 +124,7 @@ test('dark document preview follows the app while UIC slide colors remain author
   const preview = page.frameLocator('iframe')
   await expect(preview.locator('html')).toHaveAttribute('data-theme', 'dark')
   expect(await preview.locator('body').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(25, 29, 36)')
-  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
+  await openText(page, uic)
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
   const color = await preview.locator('svg.current h1').evaluate(el => getComputedStyle(el).color)
   await page.getByRole('button', { name: 'Preferences', exact: true }).click()

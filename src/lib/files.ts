@@ -1,7 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { translator, type Language } from './i18n'
 
-export interface OpenDocument { path: string; text: string; lineEnding: 'lf' | 'crlf'; bom: boolean }
+export interface OpenDocument { path: string; text: string; lineEnding: 'lf' | 'crlf'; bom: boolean; kind?: 'markdown' | 'html' | 'pdf'; data?: string }
 export const desktop = isTauri()
 
 export async function openDocument(language: Language = 'en'): Promise<OpenDocument | null> {
@@ -9,19 +9,40 @@ export async function openDocument(language: Language = 'en'): Promise<OpenDocum
   return new Promise((resolve, reject) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.md,.markdown,.mdown,.txt'
+    input.accept = '.md,.markdown,.mdown,.txt,.html,.htm,.pdf'
     input.onchange = async () => {
       try {
         const file = input.files?.[0]
         if (!file) return resolve(null)
-        if (file.size > 16 * 1024 * 1024) throw new Error(translator(language)('documentTooLarge'))
-        const raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await file.arrayBuffer())
-        resolve({ path: file.name, text: raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'), lineEnding: raw.includes('\r\n') ? 'crlf' : 'lf', bom: raw.startsWith('\uFEFF') })
+        resolve(await documentFromFile(file, language))
       } catch (cause) { reject(cause) }
     }
     input.addEventListener('cancel', () => resolve(null))
     input.click()
   })
+}
+
+export async function documentFromFile(file: File, language: Language = 'en'): Promise<OpenDocument> {
+  const pdf = /\.pdf$/i.test(file.name)
+  if (file.size > (pdf ? 64 : 16) * 1024 * 1024) throw new Error(translator(language)(pdf ? 'pdfTooLarge' : 'documentTooLarge'))
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (pdf) {
+    if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Invalid PDF')
+    let binary = ''
+    for (let index = 0; index < bytes.length; index += 32768) binary += String.fromCharCode(...bytes.subarray(index, index + 32768))
+    return { path: file.name, kind: 'pdf', data: btoa(binary), text: '', lineEnding: 'lf', bom: false }
+  }
+  const raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
+  return { path: file.name, kind: /\.html?$/i.test(file.name) ? 'html' : 'markdown', text: raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'), lineEnding: raw.includes('\r\n') ? 'crlf' : 'lf', bom: raw.startsWith('\uFEFF') }
+}
+
+export async function resource(documentPath: string | null, relativePath: string): Promise<string> {
+  if (desktop && documentPath) return invoke<string>('read_resource', { documentPath, relativePath: decodeURIComponent(relativePath) })
+  if (documentPath) {
+    const data = await (await import('./folders')).browserResource(documentPath, relativePath)
+    if (data) return data
+  }
+  throw new Error(`Resource unavailable: ${relativePath}`)
 }
 
 export async function saveDocument(path: string | null, text: string, expected: string | null, format: { lineEnding: 'lf' | 'crlf'; bom: boolean; suggestedName: string }): Promise<string | null> {
@@ -59,14 +80,14 @@ export async function loadTheme(language: Language = 'en'): Promise<string | nul
 }
 
 export async function resolveImages(frame: HTMLIFrameElement, path: string | null, language: Language = 'en'): Promise<void> {
-  if (!desktop || !path) return
+  if (!path) return
   const images = Array.from(frame.contentDocument?.querySelectorAll('img, image') || [])
   await Promise.all(images.map(async (image) => {
     const attribute = image.tagName.toLowerCase() === 'img' ? 'src' : image.hasAttribute('href') ? 'href' : 'xlink:href'
     const src = image.getAttribute(attribute)
     if (!src || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(src)) return
     try {
-      const data = await invoke<string>('read_image', { documentPath: path, relativePath: decodeURIComponent(src) })
+      const data = await resource(path, src)
       if (image.isConnected) image.setAttribute(attribute, data)
     } catch { image.setAttribute('aria-label', `[${translator(language)('imageFailed')}] ${image.getAttribute('alt') || src}`) }
   }))

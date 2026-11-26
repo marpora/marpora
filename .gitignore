@@ -7,3 +7,6 @@ playwright-report/
 .DS_Store
 *.local
 .hallmark/captures/
+public/pdfjs/
+tmp/
+output/

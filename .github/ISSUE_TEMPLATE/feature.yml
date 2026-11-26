@@ -1,0 +1,14 @@
+name: Feature request / 功能建议
+description: Suggest a concrete improvement.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do? / 你想完成什么？
+      description: Describe your workflow and the result you need.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Suggested behavior / 建议的行为

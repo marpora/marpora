@@ -1,71 +1,56 @@
-# Marpora
+<p align="center"><img src="brand/mark.svg" width="88" alt="Marpora folded M"></p>
+<h1 align="center">Marpora</h1>
+<p align="center">Write locally. Present freely.</p>
+<p align="center">A lightweight Markdown editor with live editing and Marp slides.<br>macOS first. Built with Tauri, Svelte, TypeScript and CodeMirror.</p>
+<p align="center"><a href="README.zh-CN.md">简体中文</a> · <a href="#development">Development</a> · <a href="docs/architecture.md">Architecture</a> · <a href="brand/README.md">Brand assets</a></p>
 
-一个轻量、本地优先的 Markdown 与 Marp 桌面工作台。macOS 优先，使用 Tauri 2、Svelte 5、TypeScript、CodeMirror 6 和 Marp Core 5。
+![Folder workspace and document tabs](docs/screenshots/marpora-workspace.png)
 
-![Marpora 原位编辑](docs/screenshots/live-light.png)
+Marpora is an early desktop prototype for writing Markdown and making presentations from the same plain-text files. It uses the system WebView and does **not bundle Chromium or Node.js**.
 
-## 运行
+## What works
 
-需要 Node.js 24+、Rust stable，以及对应平台的 [Tauri 开发依赖](https://v2.tauri.app/start/prerequisites/)。macOS 需要 Xcode Command Line Tools。
+- **Live editing:** formatted headings, emphasis, links, lists and quotes. Click rendered code, tables or images to edit the original Markdown. Switch to source mode without losing selection or undo history.
+- **Files and tabs:** open a folder, browse its nested Markdown / HTML / PDF files, and keep multiple documents open. Each Markdown tab retains its own text, undo history, selection and scroll position.
+- **Marp previews:** automatic `marp: true` detection, slide navigation, speaker notes, presentation mode, fragments, custom CSS themes and local KaTeX fonts.
+- **HTML and PDF:** open exported Marp HTML as a script-free, read-only slide preview; read PDFs with page navigation and zoom. Export standalone HTML or PDF without changing the Markdown buffer.
+- **English and Chinese:** English by default. Light, dark or system appearance; system, blue, teal, rose or amber accents.
+- **Local documents:** UTF-8 BOM and LF/CRLF preservation, atomic disk saves, external-change checks, close warnings and recovery of multiple unsaved drafts.
+
+Marp front matter, slide separators, comments and custom directives stay in the original source. Live editing never round-trips a rendered DOM or a rich-text AST back into Markdown.
+
+## Try it
+
+Open a Markdown file with **Open**, or choose **Open folder** to browse a workspace. Markdown opens in live editing; a Marp deck opens with a slide preview. The sidebar can be hidden while you write. Use **Export → HTML / PDF** for a copy of the current buffer, including unsaved edits. Exporting does not save the original document.
+
+The [UIC fixture](examples/uic/example.md) exercises ten slides, custom layouts, comments, fragments, code, tables and notes. Open it through the same file picker as any other document. It is a compatibility fixture, not a dedicated product action. The MIT-licensed theme and known extension are attributed in [examples/uic](examples/uic); Marpora does not execute arbitrary external Marp JavaScript engines.
+
+### Preview and export details
+
+| Feature | Implementation |
+| --- | --- |
+| Markdown / Marp preview | Sanitized HTML in an iframe with authored scripts disabled |
+| Existing HTML | Read-only; Marp SVG slides are recognized, other HTML is shown as a document |
+| PDF preview | PDF.js, loaded only when a PDF is opened; CMaps, fonts and decoding assets are local |
+| Standalone HTML export | Embedded images, CSS resources and math fonts; app-owned keyboard navigation; printable slides |
+| macOS slide PDF export | A small Swift helper linked to system WebKit and PDFKit; no additional browser installation required |
+| Windows / Linux PDF export | Reuses an installed Chrome, Edge or Chromium at supported standard paths; no browser download or bundled runtime |
+| Browser development mode | File/folder upload and downloads; PDF export uses the browser print dialog |
+
+Ordinary document PDF export reuses an installed Chrome/Edge/Chromium on all platforms. Marp decks use native macOS export without that dependency.
+
+When a local document needs `../images/...`, open its containing project folder so access stays within that granted folder. Opening a single file grants resources only inside its own directory. Missing export resources stop the export with an error instead of silently producing an incomplete deck. Remote resources require network access when fetched; embedded exports can then be used offline.
+
+## Development
+
+Requires Node.js 24+, stable Rust and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS builds also require the Xcode Swift compiler and macOS SDK.
 
 ```sh
 npm ci
 npm run desktop
 ```
 
-浏览器开发模式：`npm run dev`，访问 `http://127.0.0.1:1420`。浏览器模式通过上传打开文件、通过下载保存文件；桌面模式使用系统文件对话框和原生保存。
-
-## 当前原型
-
-- 默认原位编辑：标题、强调、链接、列表与引用即时排版；当前段落恢复 Markdown 标记，表格、代码和图片点击后显示原始源码编辑。
-- 一键切换源码模式（⌘ / Ctrl + /），保留选区与撤销历史；支持语法高亮、自动换行、查找替换。
-- 中英文界面，默认英文；偏好设置中随时切换，原有文档内容不会随界面语言翻译。
-- 浅色、深色及跟随系统外观（默认）；强调色可跟随系统或选择蓝、青、玫瑰、琥珀色。系统强调色取决于 WebView 支持，不支持时使用蓝色。设置保存在本机，幻灯片保持模板配色。
-- 文档实时预览、源码滚动同步；支持表格、代码、链接、HTML 与图片。
-- 自动识别 front matter 中的 `marp: true`；也可以手动选择文档或幻灯片模式。
-- Marp 幻灯片分页、导航、演讲者备注、演示模式与 fragment 逐步显示。
-- 内置 UIC 主题和完整模板示例，支持 `<pause>` / `<enter>`、`<!-- hide -->`、`%%` 行注释。
-- 加载自定义 Marp 主题 CSS；Marp 公式按需加载 KaTeX，数学字体在本地打包。
-- 系统文件打开/保存/另存为、拖入 Markdown、快捷键、可调整双栏、单栏编辑或预览。
-- 未保存提示与本机草稿恢复。原生保存采用临时文件替换，并在覆盖前检查外部修改，保留 UTF-8 BOM 和 LF/CRLF。
-
-普通文档默认使用单栏原位编辑；可切换源码及双栏预览，Marp 文件默认双栏显示编辑器与幻灯片。当前复杂表格、代码与图片点击后以源码编辑，尚未提供表格单元格的富文本操作。已有 HTML/PDF 文件查看、HTML/PDF 导出、文件树、多文档标签与 Finder 文件关联尚未实现。当前无云端服务或遥测。文档引用的远程图片或 CSS 资源仍可能发起网络请求。
-
-## 验证你的 UIC 模板
-
-![UIC 幻灯片预览](docs/screenshots/uic-slides.png)
-
-点击工具栏 **UIC 示例**，或者通过 **打开** 选择：
-
-```text
-../../git/uic/slides/marp-uic-template/slides/example.md
-```
-
-十张示例幻灯片包含封面、分隔页、双栏、代码、逐步显示、iClicker 问题与答案页、表格和辅助样式。写作预览默认显示全部 fragment；点击 **演示** 后按空格或右方向键逐步显示，按 Esc 返回。演示是应用内的专注视图，可再使用系统窗口全屏按钮。
-
-UIC CSS 与引擎来自 [marp-uic-slides-template](https://github.com/xjtuwxg/marp-uic-slides-template)，按 MIT 许可证保留在 `examples/uic`。内置副本增加编辑器源码位置映射，并修复所有幻灯片都隐藏时仍显示内容的问题；原始模板仓库没有修改。外部 JavaScript 引擎不会自动执行，原型仅加载内置的已知扩展。
-
-加载其他主题时，CSS 需要有 `/* @theme name */`，并在 Markdown 中使用 `theme: name`。只支持已注册主题间的 `@import`；主题相对图片、字体资源需要可访问的 URL。
-
-原生文档内的相对图片限定在文档目录及其子目录，禁止越界与符号链接逃逸。浏览器模式无法读取同目录其他文件。Markdown 以 UTF-8 处理；打开保存不会通过富文本 AST 重写源码。
-
-## 快捷键
-
-| 操作 | macOS | Windows / Linux |
-| --- | --- | --- |
-| 原位 / 源码切换 | ⌘ / | Ctrl / |
-| 新建 | ⌘ N | Ctrl N |
-| 打开 | ⌘ O | Ctrl O |
-| 保存 | ⌘ S | Ctrl S |
-| 另存为 | ⌘ Shift S | Ctrl Shift S |
-| 查找 | ⌘ F | Ctrl F |
-| 撤销 / 重做 | ⌘ Z / ⌘ Shift Z | Ctrl Z / Ctrl Shift Z |
-| 演示翻页 / 逐步显示 | 方向键 / 空格 | 方向键 / 空格 |
-| 退出演示 | Esc | Esc |
-
-草稿保存在应用 WebView 的本地存储中，不会自动写回原文件；这是崩溃恢复辅助功能，正式保存仍使用 ⌘ / Ctrl S。
-
-## 构建与检查
+For browser development, run `npm run dev` and visit `http://127.0.0.1:1420`. Browser folder access is session-only; draft recovery restores text, not filesystem permissions.
 
 ```sh
 npm run check
@@ -75,16 +60,31 @@ cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run desktop:build -- --bundles app,dmg
 ```
 
-浏览器测试在 macOS 上使用已安装的 Chrome；其他环境先运行 `npx playwright install chromium`。前端测试覆盖真实模板、模式切换无损、局部编辑及撤销、偏好设置、fragment、隐藏页、行注释、源码映射和 HTML 清理；浏览器测试覆盖原位块点击、组合输入事件、整篇删除及撤销、BOM/CRLF 字节往返、原位标题修改后保留 Marp 元数据/自定义指令、双语持久化、系统外观实时变化、模板配色隔离、演示键盘、未保存保护与草稿恢复。组合输入自动化只覆盖浏览器事件流程，实际输入法仍建议在目标系统试用。Rust 测试覆盖磁盘冲突、编码格式和资源路径权限。
+Playwright uses an installed Chrome on macOS. Elsewhere, run `npx playwright install chromium` for **development tests only**. That browser is not included in the application. PDF.js preview resources are copied by the `predev` / `prebuild` scripts. The pinned CodeMirror view version preserves verified mixed line-height behavior; upgrades should run the complete live-editing suite.
 
-macOS 产物在 `src-tauri/target/release/bundle/macos/` 和 `src-tauri/target/release/bundle/dmg/`。当前只在本机验证了 Apple Silicon macOS；本地包使用临时签名，尚未进行 Apple Developer ID 签名、公证或 Windows 签名。
+## Shortcuts
 
-`.github/workflows/packages.yml` 可手动运行或通过 `v*` 标签触发，为 Apple Silicon、Intel Mac、Windows x64 与 Linux x64 构建安装包并上传 workflow artifacts。它不会自动发布 GitHub Release。Windows/Linux 的实际构建和 WebView 行为需要在 CI 与对应系统上验证。
+| Action | macOS | Windows / Linux |
+| --- | --- | --- |
+| Live / source | ⌘ / | Ctrl / |
+| New / Open | ⌘ N / ⌘ O | Ctrl N / Ctrl O |
+| Open folder | ⌘ Shift O | Ctrl Shift O |
+| Save / Save as | ⌘ S / ⌘ Shift S | Ctrl S / Ctrl Shift S |
+| Close tab | ⌘ W | Ctrl W |
+| Next / previous tab | Ctrl Tab / Ctrl Shift Tab | Ctrl Tab / Ctrl Shift Tab |
+| Find / Replace | ⌘ F | Ctrl F |
+| Presentation | Arrow keys / Space; Esc to exit | Arrow keys / Space; Esc to exit |
 
-## 实现取舍
+## Status and distribution
 
-CodeMirror 中的文本是唯一真源。原位显示由 decorations 和只读 widgets 实现，不从渲染后的 HTML 反向生成 Markdown。front matter、HTML、Marp 指令和行注释保留源码显示；未知指令也不会被清理或重排。切换显示模式只重配扩展，不替换文档或重建撤销历史。独立预览在 180 ms 停止输入后更新；Marp 和公式模块按需加载。应用不捆绑 Chromium 或 Node.js。预览 HTML 经清理后显示于禁用脚本的 iframe，文件权限留在原生主窗口。
+This is a prototype, verified locally on Apple Silicon macOS. Windows, Linux and Intel Mac packaging are configured in [the packaging workflow](.github/workflows/packages.yml); their runtime behavior still needs validation on those systems. The workflow uploads artifacts, and does not publish releases automatically. Local macOS builds are ad-hoc signed, without Developer ID signing or notarization.
 
-目前渲染仍在前端主线程；大文档性能尚未基准测试，后续可以将 Marp 转换移入 Worker。预览区只渲染一张可见幻灯片，但整副牌的 DOM 会保留，适合当前轻量原型规模。
+Complex blocks use source editing rather than rich table-cell operations. Arbitrary Marp plugins, editing PDFs/HTML, Finder file associations, a full template gallery and filesystem watching are not implemented. Large-document performance has not been benchmarked; Marp rendering still runs on the UI thread. HTML scripts are intentionally disabled in previews, so third-party JavaScript features are not reproduced. PDF.js renders a canvas, without text selection or a search layer yet.
 
-编辑器视图依赖锁定为 `@codemirror/view 6.43.15`，以保留已验证的混合行高行为；升级时请运行段落点击定位与组合输入测试。
+The project has no telemetry or cloud sync. Referenced remote images and theme resources can still make network requests. Optional draft recovery uses local WebView storage and does not replace saving to disk.
+
+## Project
+
+The application stays in **[marpora/marpora](https://github.com/marpora/marpora)**. A future product website can live in `marpora/marpora.github.io`, with reusable themes in a separate `marpora/templates` repository. These are planned destinations, not currently published services. See the [repository plan](docs/github/repository-plan.md).
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Marpora is available under the [MIT license](LICENSE). It is an independent project and is not affiliated with Typora or the Marp team.
