@@ -56,6 +56,9 @@ For browser development, run `npm run dev` and visit `http://127.0.0.1:1420`. Br
 npm run check
 npm test
 npm run test:e2e
+# Optional Chromium + WebKit interaction regressions (install WebKit first):
+# npx playwright install webkit
+npm run test:interaction
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run desktop:build -- --bundles app,dmg
 ```
@@ -73,11 +76,12 @@ Playwright uses an installed Chrome on macOS. Elsewhere, run `npx playwright ins
 | Close tab | ⌘ W | Ctrl W |
 | Next / previous tab | Ctrl Tab / Ctrl Shift Tab | Ctrl Tab / Ctrl Shift Tab |
 | Find / Replace | ⌘ F | Ctrl F |
+| Preview navigation | Click the preview, then arrow keys; Home / End | Click the preview, then arrow keys; Home / End |
 | Presentation | Arrow keys / Space; Esc to exit | Arrow keys / Space; Esc to exit |
 
 ## Status and distribution
 
-This is a prototype, verified locally on Apple Silicon macOS. Windows, Linux and Intel Mac packaging are configured in [the packaging workflow](.github/workflows/packages.yml); their runtime behavior still needs validation on those systems. The workflow uploads artifacts, and does not publish releases automatically. Local macOS builds are ad-hoc signed, without Developer ID signing or notarization.
+This is a prototype, verified locally on Apple Silicon macOS. The [packaging workflow](.github/workflows/packages.yml) builds Apple Silicon and Intel Mac DMGs on pushes to main, version tags or manual runs. Windows/Linux distribution is planned for a later release; cross-platform source support remains in place. Intel runtime behavior still needs validation on an Intel Mac. The workflow uploads DMGs as downloadable Actions artifacts for 30 days, and does not publish releases automatically. Local macOS builds are ad-hoc signed, without Developer ID signing or notarization.
 
 Complex blocks use source editing rather than rich table-cell operations. Arbitrary Marp plugins, editing PDFs/HTML, Finder file associations, a full template gallery and filesystem watching are not implemented. Large-document performance has not been benchmarked; Marp rendering still runs on the UI thread. HTML scripts are intentionally disabled in previews, so third-party JavaScript features are not reproduced. PDF.js renders a canvas, without text selection or a search layer yet.
 

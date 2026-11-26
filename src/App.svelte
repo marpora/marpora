@@ -200,7 +200,7 @@
   function next() { const max = preview?.fragmentCount() || 0; if (presenting && step < max) step++; else go(slide + 1) }
   function previous() { if (presenting && step > 0) step--; else go(slide - 1) }
   function togglePresentation() { presenting = !presenting; step = presenting ? 0 : Number.MAX_SAFE_INTEGER }
-  function keyboard(event: KeyboardEvent) {
+  function keyboard(event: KeyboardEvent, fromPreview = false) {
     if (event.isComposing) return
     if (event.key === 'Escape') { preferencesOpen = false; exportOpen = false }
     const mod = event.metaKey || event.ctrlKey
@@ -211,7 +211,7 @@
     else if (mod && event.key.toLowerCase() === 'w') { event.preventDefault(); void closeTab(activeId) }
     else if (event.ctrlKey && event.key === 'Tab') { event.preventDefault(); const index = tabs.findIndex(tab => tab.id === activeId); activate(tabs[(index + (event.shiftKey ? tabs.length - 1 : 1)) % tabs.length].id) }
     else if (event.key === 'Escape' && presenting) { event.preventDefault(); presenting = false; step = Number.MAX_SAFE_INTEGER }
-    else if (presenting && !mod && !event.altKey) {
+    else if ((presenting || (currentMode === 'slides' && (fromPreview || (event.target instanceof Element && !!event.target.closest('.preview-pane'))))) && !mod && !event.altKey && !event.shiftKey) {
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); next() }
       if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); previous() }
       if (event.key === 'Home') { event.preventDefault(); go(0) }
@@ -324,7 +324,10 @@
 
     <button class="splitter" aria-label={t('resize')} title={t('resizeHint')} onpointerdown={(event) => { dragging = true; event.currentTarget.setPointerCapture(event.pointerId) }} onkeydown={(event) => { if (event.key === 'ArrowLeft') split = Math.max(25, split - 2); if (event.key === 'ArrowRight') split = Math.min(75, split + 2) }}></button>
 
-    <section class="preview-pane" aria-label={t('preview')}>
+    <section class="preview-pane" aria-label={t('preview')} tabindex="-1" onpointerdown={event => {
+      // Clicking the preview's non-interactive chrome must release editor focus.
+      if (!(event.target as Element).closest('button,input,select,textarea,a')) event.currentTarget.focus({ preventScroll: true })
+    }}>
       <div class="pane-heading preview-heading">
         {#if active.kind === 'markdown'}<div class="mode-switch" aria-label={t('previewMode')}>
           <button class:active={mode === 'auto'} aria-pressed={mode === 'auto'} onclick={() => active.mode = 'auto'}>{t('auto')}</button>
@@ -342,7 +345,7 @@
         {#if currentMode === 'slides'}
           <div class="deck-heading"><span>{result.theme}</span><button class="quiet-button" onclick={togglePresentation} disabled={slideCount === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z"/></svg>{t('present')}</button></div>
         {/if}
-        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={presenting ? step : Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={keyboard} language={preferences.language} {scheme} accent={preferences.accent}/>
+        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={presenting ? step : Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={event => keyboard(event, true)} language={preferences.language} {scheme} accent={preferences.accent}/>
         {#if currentMode === 'slides'}
           <div class="slide-navigation">
             <button class="icon-button" aria-label={t('previousSlide')} onclick={previous} disabled={slide === 0 && step === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>

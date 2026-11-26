@@ -6,6 +6,10 @@ A workspace tab owns its source, saved snapshot, original encoding format and vi
 
 One DOM editor is active at a time. `EditorSessions` caches immutable CodeMirror states, selection, history and scroll positions. Restoring a state reconfigures its extensions to the current component and preferences. Saving captures the target tab and source before awaiting a dialog; switching tabs cannot send a save result to a different document. Recovery stores all dirty Markdown buffers, but restores them without disk paths so a stale permission or external file is not overwritten accidentally.
 
+Block preview spacing is padding on a measured wrapper, never vertical margins on a block widget. CodeMirror excludes margins from its height map, which otherwise makes later visual lines map to the wrong source position.
+
+Slides are a read-only display surface: pointer events pass through the script-free iframe to the parent preview pane, and the slide iframe is excluded from the Tab sequence. This is necessary because WebKit blocks even parent-registered event callbacks inside a sandbox without scripts. The pane takes focus on clicks; arrow-key navigation is scoped to that focused surface. Source cursor movement continues to follow the editor without changing its saved text.
+
 ## File access
 
 Rust tracks canonical documents and explicitly opened directory roots. Folder listing is lazy and skips hidden/build directories and symlinks. Opening descendants and resolving resources checks canonical paths against the granted root, including symlink resolution. Single-file access limits resources to the document's parent directory. Directory roots are session-only. Original files are not rewritten by HTML/PDF export or preview.

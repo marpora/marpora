@@ -44,6 +44,7 @@ button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 .layout-controls button.active { background: var(--color-paper-3); color: var(--color-accent); }
 .workspace { display: grid; grid-template-columns: minmax(0, var(--split)) 5px minmax(0, 1fr); flex: 1; min-height: 0; }
 .editor-pane, .preview-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.preview-pane:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .pane-heading { display: flex; align-items: center; justify-content: space-between; min-height: 47px; gap: var(--space-xs); padding: 0 var(--space-lg); border-bottom: 1px solid var(--color-rule); font-size: 12px; user-select: none; }
 .pane-label { display: flex; align-items: center; gap: var(--space-xs); font-weight: 550; }
 .source-mark { font-family: var(--font-code); color: var(--color-muted); font-size: 18px; font-weight: 400; }
@@ -81,7 +82,8 @@ iframe { display: block; width: 100%; height: 100%; border: none; background: va
 .deck-heading .quiet-button { background: var(--color-accent); color: var(--color-accent-ink); min-height: 32px; }
 .deck-heading .quiet-button:hover { background: var(--color-ink-2); }
 .slide-stage { flex: 1; display: flex; align-items: center; padding: var(--space-lg); background: var(--color-paper); }
-.slide-frame { height: auto; aspect-ratio: var(--slide-ratio, 16 / 9); max-height: 100%; background: var(--color-paper-3); outline: 1px solid var(--color-rule); }
+/* Keep slide pointer/keyboard focus in the parent: WebKit blocks callbacks inside script-free frames. */
+.slide-frame { pointer-events: none;  height: auto; aspect-ratio: var(--slide-ratio, 16 / 9); max-height: 100%; background: var(--color-paper-3); outline: 1px solid var(--color-rule); }
 .slide-navigation { display: flex; align-items: center; justify-content: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-lg); position: relative; font-size: 12px; font-variant-numeric: tabular-nums; }
 .counter-separator { padding-inline: var(--space-xs); color: var(--color-gutter); }
 .notes-toggle { position: absolute; right: var(--space-lg); min-height: 36px; padding-inline: var(--space-sm); }
@@ -178,6 +180,8 @@ kbd { font-family: var(--font-code); margin-left: var(--space-xs); opacity: .6; 
 .mp-live .mp-metadata { background: var(--color-paper); border-left: 2px solid var(--color-rule); }
 .mp-live .mp-directive { color: var(--syntax-comment); }
 .mp-rendered { position: relative; margin: var(--space-sm) var(--space-sm); cursor: text; overflow-wrap: anywhere; }
+.mp-block-wrapper { padding-block: var(--space-sm); }
+.mp-block-wrapper > .mp-rendered { margin-block: 0; }
 .mp-rendered:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .mp-rendered-code { background: var(--color-paper); padding: var(--space-lg); border-radius: 4px; }
 .mp-rendered pre { font-family: var(--font-code); font-size: 13px; line-height: 1.85; overflow-x: auto; margin: 0; }

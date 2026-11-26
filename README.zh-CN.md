@@ -49,11 +49,11 @@ npm run desktop:build -- --bundles app,dmg
 
 macOS 浏览器测试使用已安装的 Chrome，其他环境可为开发测试运行 `npx playwright install chromium`，该测试浏览器不会打入应用。测试覆盖源码无损、组合输入事件、撤销、BOM/CRLF、模板指令、中英文、系统外观、文件树、多标签状态、HTML 嵌入资源、脚本清理和 PDF 翻页/缩放。
 
-快捷键包括 ⌘ / Ctrl + O 打开、Shift + O 打开目录、S 保存、Shift + S 另存为、N 新建、W 关闭标签、/ 切换源码；Ctrl Tab 切换标签。演示时方向键翻页，空格逐步显示，Esc 退出。
+快捷键包括 ⌘ / Ctrl + O 打开、Shift + O 打开目录、S 保存、Shift + S 另存为、N 新建、W 关闭标签、/ 切换源码；Ctrl Tab 切换标签。点击右侧幻灯片或预览区后，方向键即可翻页；点击左侧后恢复光标移动。演示时空格逐步显示，Esc 退出。
 
 ## 当前边界
 
-目前在 Apple Silicon macOS 本机验证；[打包工作流](.github/workflows/packages.yml) 为 Intel Mac、Windows、Linux 配置了构建，但这些平台的运行效果还需实机验证。macOS 本地包为临时签名，尚未 Developer ID 签名、公证；工作流上传构建产物，不自动发布 Release。
+目前在 Apple Silicon macOS 本机验证；[打包工作流](.github/workflows/packages.yml) 在 main 更新、版本标签或手动运行时生成 Apple Silicon 与 Intel Mac DMG；Actions 产物保留 30 天。Windows/Linux 发行包后续启用，跨平台源码继续保留；Intel 运行效果仍需实机验证。macOS 本地包为临时签名，尚未 Developer ID 签名、公证；工作流上传构建产物，不自动发布 Release。
 
 尚无表格单元格富文本操作、文件关联、文件监听、模板商城或任意外部 Marp 插件。大文档性能未做基准测试，Marp 渲染仍在前端主线程。没有遥测、云同步；文档中的远程资源仍可能发起网络请求。草稿是本机恢复辅助，不代替正式保存。
 

@@ -47,7 +47,7 @@ test('UIC template renders and supports slide navigation and presentation fragme
   await page.getByRole('button', { name: '06 Code, then', exact: false }).click()
   await page.getByRole('button', { name: 'Present', exact: true }).click()
   await expect(preview.locator('svg.current .unrevealed')).toHaveCount(2)
-  await preview.locator('svg.current h2').click()
+  await page.getByTestId('preview-surface').click()
   await page.keyboard.press('Space')
   await expect(preview.locator('svg.current .unrevealed')).toHaveCount(1)
   await page.keyboard.press('Escape')
