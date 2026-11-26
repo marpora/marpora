@@ -1,0 +1,12 @@
+{
+  "scanned": "2026-11-25",
+  "scope": "app",
+  "mode": "fast prototype",
+  "findings": { "project": "Empty repository", "material": "User UIC Marp template and working Markdown editor" },
+  "preserve": ["UIC authored slide typography, theme and Markdown source"],
+  "introduce": ["Tauri desktop shell", "quiet dual-pane writing workspace", "local system fonts for offline use"],
+  "theme": "Wayfind, adapted to native app controls",
+  "verification": "Static sloplint plus Playwright screenshots; Hallmark render unavailable without puppeteer-core",
+  "waived": { "47b": "slide-frame is an actual live document iframe, not drawn OS chrome" },
+  "judged": { "F4": "Filled selected segments and slide navigation indicate state; Present is the sole filled action." }
+}

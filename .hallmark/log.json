@@ -1,0 +1,17 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "wayfind",
+  "axes": "light/system/cool",
+  "signature": "live Markdown and Marp workspace",
+  "entry": "src/App.svelte",
+  "prompt": "Marpora macOS-first Markdown and Marp prototype",
+  "waived": [
+   "47b: slide-frame is a live iframe, not redrawn OS chrome"
+  ],
+  "verification": "Static floor 0 FAIL; Playwright screenshots and native WKWebView verified; Hallmark render unavailable without puppeteer-core",
+  "date": "2026-11-26",
+  "mode": "build"
+ }
+]
