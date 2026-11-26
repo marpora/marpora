@@ -12,6 +12,8 @@ use tauri::{
     Emitter, Manager,
 };
 use tauri_plugin_dialog::DialogExt;
+mod export;
+mod workspace;
 
 const MAX_DOCUMENT: u64 = 16 * 1024 * 1024;
 const MAX_IMAGE: u64 = 20 * 1024 * 1024;
@@ -26,6 +28,9 @@ struct OpenDocument {
     text: String,
     line_ending: String,
     bom: bool,
+    kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<String>,
 }
 
 fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
@@ -43,7 +48,21 @@ fn decode_document(path: &Path) -> Result<OpenDocument, String> {
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    if !["md", "markdown", "mdown", "txt"].contains(&extension.as_str()) {
+    if extension == "pdf" {
+        let bytes = read_limited(&path, 64 * 1024 * 1024)?;
+        if !bytes.starts_with(b"%PDF-") {
+            return Err("MAR_PORA:invalidPdf".into());
+        }
+        return Ok(OpenDocument {
+            path: path.to_string_lossy().into_owned(),
+            text: String::new(),
+            line_ending: "lf".into(),
+            bom: false,
+            kind: "pdf".into(),
+            data: Some(STANDARD.encode(bytes)),
+        });
+    }
+    if !["md", "markdown", "mdown", "txt", "html", "htm"].contains(&extension.as_str()) {
         return Err("MAR_PORA:markdownOnly".into());
     }
     let raw = String::from_utf8(read_limited(&path, MAX_DOCUMENT)?)
@@ -53,6 +72,13 @@ fn decode_document(path: &Path) -> Result<OpenDocument, String> {
         text: raw.trim_start_matches('\u{feff}').replace("\r\n", "\n"),
         line_ending: if raw.contains("\r\n") { "crlf" } else { "lf" }.into(),
         bom: raw.starts_with('\u{feff}'),
+        kind: if ["html", "htm"].contains(&extension.as_str()) {
+            "html"
+        } else {
+            "markdown"
+        }
+        .into(),
+        data: None,
     })
 }
 
@@ -84,7 +110,10 @@ async fn open_document(
         let Some(selected) = app
             .dialog()
             .file()
-            .add_filter("Markdown", &["md", "markdown", "mdown", "txt"])
+            .add_filter(
+                "Documents",
+                &["md", "markdown", "mdown", "txt", "html", "htm", "pdf"],
+            )
             .blocking_pick_file()
         else {
             return Ok(None);
@@ -308,6 +337,34 @@ fn build_menu(app: &tauri::AppHandle, language: &str) -> tauri::Result<Menu<taur
             &quit,
         ],
     )?;
+    let open_folder = MenuItem::with_id(
+        app,
+        "open-folder",
+        label("Open Folder…", "打开文件夹…"),
+        true,
+        Some("CmdOrCtrl+Shift+O"),
+    )?;
+    let close_tab = MenuItem::with_id(
+        app,
+        "close-tab",
+        label("Close Tab", "关闭标签页"),
+        true,
+        Some("CmdOrCtrl+W"),
+    )?;
+    let export_html = MenuItem::with_id(
+        app,
+        "export-html",
+        label("Export HTML…", "导出 HTML…"),
+        true,
+        None::<&str>,
+    )?;
+    let export_pdf = MenuItem::with_id(
+        app,
+        "export-pdf",
+        label("Export PDF…", "导出 PDF…"),
+        true,
+        None::<&str>,
+    )?;
     let file = Submenu::with_items(
         app,
         label("File", "文件"),
@@ -315,10 +372,14 @@ fn build_menu(app: &tauri::AppHandle, language: &str) -> tauri::Result<Menu<taur
         &[
             &new,
             &open,
+            &open_folder,
             &save,
             &save_as,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, Some(label("Close Window", "关闭窗口")))?,
+            &export_html,
+            &export_pdf,
+            &PredefinedMenuItem::separator(app)?,
+            &close_tab,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -348,13 +409,20 @@ fn set_language(app: tauri::AppHandle, language: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Documents::default())
+        .manage(workspace::Folders::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             open_document,
             save_document,
             open_theme,
             read_image,
-            set_language
+            set_language,
+            workspace::open_folder,
+            workspace::list_folder,
+            workspace::open_workspace_file,
+            workspace::read_document,
+            workspace::read_resource,
+            export::export_document
         ])
         .menu(|app| build_menu(app, "en"))
         .on_menu_event(|app, event| {
@@ -362,18 +430,34 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
-                let Some(path) = paths.first().cloned() else {
-                    return;
-                };
+                let paths = paths.clone();
                 let app = window.app_handle().clone();
-                tauri::async_runtime::spawn_blocking(move || match decode_document(&path) {
-                    Ok(document) => {
-                        let documents = app.state::<Documents>();
-                        let _ = grant(&documents, PathBuf::from(&document.path));
-                        let _ = app.emit("document-dropped", document);
-                    }
-                    Err(error) => {
-                        let _ = app.emit("document-error", error);
+                tauri::async_runtime::spawn_blocking(move || {
+                    for path in paths {
+                        if path.is_dir() {
+                            match workspace::register_folder(
+                                &app.state::<workspace::Folders>(),
+                                &path,
+                            ) {
+                                Ok(folder) => {
+                                    let _ = app.emit("folder-dropped", folder);
+                                }
+                                Err(error) => {
+                                    let _ = app.emit("document-error", error);
+                                }
+                            }
+                            continue;
+                        }
+                        match decode_document(&path) {
+                            Ok(document) => {
+                                let _ =
+                                    grant(&app.state::<Documents>(), PathBuf::from(&document.path));
+                                let _ = app.emit("document-dropped", document);
+                            }
+                            Err(error) => {
+                                let _ = app.emit("document-error", error);
+                            }
+                        }
                     }
                 });
             }

@@ -1,6 +1,6 @@
 [package]
 name = "marpora"
-version = "0.2.0"
+version = "0.3.1"
 description = "A small, local Markdown and Marp workspace"
 authors = ["Xiaoguang Wang"]
 edition = "2021"

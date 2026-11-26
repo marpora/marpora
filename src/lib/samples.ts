@@ -16,7 +16,7 @@ Write here. Headings, emphasis, code, tables, and images appear as you move betw
 
 ## Writing becomes a presentation
 
-Open the **UIC example** to try a Marp slide deck with a custom theme, speaker notes, and step-by-step reveals.
+Open a **Marp Markdown file** to preview slides, speaker notes, and step-by-step reveals. Export a standalone HTML deck or a PDF when you’re ready.
 
 \`\`\`typescript
 const idea = 'A little less friction.'
@@ -55,7 +55,7 @@ export const welcome = `# 留一点空间，给思考。
 
 ## 写作，也可以是演示
 
-点击右上角的 **UIC 示例**，试试你的课程幻灯片模板。主题、双栏布局与逐步显示都已接入。
+打开 **Marp Markdown 文件**，预览幻灯片、演讲者备注和逐步显示效果。完成后可导出独立 HTML 或 PDF。
 
 \`\`\`typescript
 const idea = 'A little less friction.'

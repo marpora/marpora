@@ -100,7 +100,7 @@ export function previewDocument(result: RenderedPreview, mode: 'document' | 'sli
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob: https: http: asset:; style-src 'unsafe-inline'; font-src 'self' data: https: asset:; script-src 'none'; base-uri 'none'; form-action 'none'"><title>Marpora preview</title><style>${themeStyles}\n${previewStyles}\n${css}</style></head><body class="${mode}"><main id="preview">${result.html}</main></body></html>`
 }
 
-const previewStyles = `
+export const previewStyles = `
 :root{--page:var(--color-paper-3);--ink:var(--color-ink);--muted:var(--color-muted);--line:var(--color-rule);--accent:var(--color-accent);--code:var(--color-paper-2);--font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}html,body{margin:0;overflow-x:clip}body{background:var(--page);color:var(--ink);font:16px/1.85 var(--font);overflow-wrap:break-word}a{color:var(--accent)}a:focus-visible{outline:2px solid var(--accent)}
 .document main{max-width:800px;margin:0 auto;padding:48px 48px 96px}.document h1,.document h2,.document h3{line-height:1.35;font-weight:650;letter-spacing:-.025em}.document h1{font-size:30px;margin:0 0 28px}.document h2{font-size:22px;margin:40px 0 16px}.document h3{font-size:18px;margin-top:28px}.document p{margin:16px 0}.document strong{font-weight:650}.document blockquote{margin:24px 0;padding:2px 20px;border-left:3px solid var(--accent);color:var(--muted);background:var(--code)}.document pre{overflow-x:auto;background:var(--code);padding:20px;border-radius:4px;font-size:13px;line-height:1.8}.document code{font-family:var(--mono);background:var(--code);padding:2px 4px}.document pre code{padding:0}.document table{border-collapse:collapse;width:100%;font-size:14px}.document th,.document td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:left}.document th{background:var(--code)}.document img{max-width:100%;height:auto}.document hr{border:0;border-top:1px solid var(--line);margin:36px 0}.document li{margin:6px 0}
@@ -108,3 +108,16 @@ const previewStyles = `
 @media(max-width:560px){.document main{padding:28px 24px 64px}.document h1{font-size:26px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 `
+
+/** Normalize exported Marp HTML into the same script-free preview as Markdown. */
+export function importHtml(source: string, language: Language = 'en'): { result: RenderedPreview; mode: 'slides' | 'document' } {
+  const doc = new DOMParser().parseFromString(source, 'text/html')
+  const slides = Array.from(doc.querySelectorAll('svg[data-marpit-svg]'))
+  const css = Array.from(doc.querySelectorAll('style')).map(el => el.textContent || '').join('\n')
+  const dimensions = slides[0]?.getAttribute('viewBox')?.split(/\s+/).map(Number)
+  const html = slides.length ? `<div>${slides.map(el => el.outerHTML).join('')}</div>` : doc.body.innerHTML
+  return {
+    mode: slides.length ? 'slides' : 'document',
+    result: { html: sanitizeHtml(html), css: `${css}\n.slides #preview>div>svg{position:relative!important;inset:auto!important;visibility:visible!important;opacity:1!important;transform:translateZ(0)!important}.slides [data-marpit-fragment]{opacity:1!important}`, titles: slides.length ? slideTitles(html, language) : [], notes: [], theme: 'HTML', aspectRatio: dimensions && dimensions[3] > 0 ? dimensions[2] / dimensions[3] : 16 / 9 },
+  }
+}

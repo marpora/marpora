@@ -1,0 +1,1 @@
+<svg width="27" height="27" viewBox="0 0 128 128" fill="none" aria-hidden="true"><path fill="#2448A6" d="M16 28 36 20v80l-20 8Z"/><path fill="#5681DF" d="m36 20 28 40v32L36 52Z"/><path fill="#2855C5" d="m64 60 28-40v32L64 92Z"/><path fill="#1E3F91" d="m92 20 20 8v80l-20-8Z"/></svg>

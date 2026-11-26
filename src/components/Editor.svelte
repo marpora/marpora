@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { EditorState, Compartment, type Extension } from '@codemirror/state'
+  import { EditorState, StateEffect, Compartment, type Extension } from '@codemirror/state'
   import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection, placeholder } from '@codemirror/view'
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
   import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
@@ -8,10 +8,11 @@
   import { tags } from '@lezer/highlight'
   import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
   import { translator, searchPhrases, type Language } from '../lib/i18n'
+  import { EditorSessions } from '../lib/workspace'
   import { livePreview, liveFocus } from '../lib/live-preview'
 
-  let { value, revision, onedit, oncursor, onscroll, wrap = true, language = 'en', editing = 'live', path = null }: {
-    value: string; revision: number; onedit: (text: string) => void;
+  let { value, revision, documentId = 'default', sessions = new EditorSessions(), onedit, oncursor, onscroll, wrap = true, language = 'en', editing = 'live', path = null }: {
+    value: string; revision: number; documentId?: string; sessions?: EditorSessions; onedit: (text: string) => void;
     oncursor: (line: number, column: number, offset: number) => void;
     onscroll: (progress: number) => void; wrap?: boolean;
     language?: Language;
@@ -21,6 +22,7 @@
   let view: EditorView | undefined
   let editorExtensions: Extension[] = []
   let appliedRevision = -1
+  let appliedId = ''
   const wrapping = new Compartment()
   const localization = new Compartment()
   const presentation = new Compartment()
@@ -69,20 +71,34 @@
       ]
     view = new EditorView({
       parent: host,
-      state: EditorState.create({ doc: value, extensions: editorExtensions }),
+      state: sessions.get(documentId)?.state.doc.toString() === value ? sessions.get(documentId)!.state.update({ effects: StateEffect.reconfigure.of(editorExtensions) }).state : EditorState.create({ doc: value, extensions: editorExtensions }),
     })
     appliedRevision = revision
-    return () => view?.destroy()
+    appliedId = documentId
+    const restored = sessions.get(documentId)
+    if (restored) requestAnimationFrame(() => { if (view) { view.scrollDOM.scrollTop = restored.top; view.scrollDOM.scrollLeft = restored.left } })
+    return () => {
+      if (view) sessions.set(appliedId, { state: view.state, top: view.scrollDOM.scrollTop, left: view.scrollDOM.scrollLeft })
+      view?.destroy()
+    }
   })
 
   $effect(() => {
     const next = revision
     const text = value
-    if (view && next !== appliedRevision) {
-      // A new document gets independent undo history; typing never resets it.
-      view.setState(EditorState.create({ doc: text, extensions: editorExtensions }))
-      view.dispatch({ effects: wrapping.reconfigure(wrap ? EditorView.lineWrapping : []) })
+    const id = documentId
+    if (view && (id !== appliedId || next !== appliedRevision)) {
+      sessions.set(appliedId, { state: view.state, top: view.scrollDOM.scrollTop, left: view.scrollDOM.scrollLeft })
+      const cached = sessions.get(id)
+      view.setState(cached && cached.state.doc.toString() === text ? cached.state.update({ effects: StateEffect.reconfigure.of(editorExtensions) }).state : EditorState.create({ doc: text, extensions: editorExtensions }))
+      appliedId = id
       appliedRevision = next
+      view.dispatch({ effects: [wrapping.reconfigure(wrap ? EditorView.lineWrapping : []), localization.reconfigure(localized()), presentation.reconfigure(editing === 'live' ? livePreview({ language, path }) : lineNumbers())] })
+      const currentView = view
+      requestAnimationFrame(() => { if (appliedId === id) { currentView.scrollDOM.scrollTop = cached?.top || 0; currentView.scrollDOM.scrollLeft = cached?.left || 0 } })
+      const position = view.state.selection.main.head
+      const current = view.state.doc.lineAt(position)
+      oncursor(current.number, position - current.from + 1, position)
     }
   })
 

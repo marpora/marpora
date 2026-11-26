@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
+async function openUic(page: Page) {
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await (await chooser).setFiles(new URL('../../examples/uic/example.md', import.meta.url).pathname)
+}
+
 async function sourceWorkspace(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Source', exact: true }).click()
@@ -31,7 +37,7 @@ test('UIC template renders and supports slide navigation and presentation fragme
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
   await sourceWorkspace(page)
-  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
+  await openUic(page)
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
   const preview = page.frameLocator('iframe')
   await expect(preview.locator('svg.current section.title')).toBeVisible()
@@ -41,7 +47,7 @@ test('UIC template renders and supports slide navigation and presentation fragme
   await page.getByRole('button', { name: '06 Code, then', exact: false }).click()
   await page.getByRole('button', { name: 'Present', exact: true }).click()
   await expect(preview.locator('svg.current .unrevealed')).toHaveCount(2)
-  await preview.locator('svg.current h2').click()
+  await page.getByTestId('preview-surface').click()
   await page.keyboard.press('Space')
   await expect(preview.locator('svg.current .unrevealed')).toHaveCount(1)
   await page.keyboard.press('Escape')
@@ -59,7 +65,7 @@ test('recovers an unsaved draft and renders formula assets', async ({ page }) =>
   await expect(preview.locator('.katex')).toBeVisible()
   const fonts = await preview.locator('body').evaluate(async () => (await document.fonts.load('16px KaTeX_Main')).length)
   expect(fonts).toBeGreaterThan(0)
-  await page.waitForFunction(() => localStorage.getItem('marpora.draft.v1')?.includes('Formula'))
+  await page.waitForFunction(() => localStorage.getItem('marpora.session.v2')?.includes('Formula'))
   page.once('dialog', dialog => dialog.accept())
   await page.reload()
   await expect(page.getByRole('status')).toContainText('Unsaved draft restored')
@@ -82,17 +88,22 @@ test('opens the user template unchanged and offers download/save', async ({ page
   expect(Buffer.concat(chunks).toString('utf8')).toBe(source)
 })
 
-test('switching documents resets history and guards unsaved changes', async ({ page }) => {
+test('tabs preserve independent history and closing guards unsaved changes', async ({ page }) => {
   await sourceWorkspace(page)
   const editor = page.getByRole('textbox', { name: 'Markdown editor' })
   await editor.fill('# draft to preserve')
-  page.once('dialog', dialog => dialog.dismiss())
-  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
-  await expect(editor).toHaveText('# draft to preserve')
-  page.once('dialog', dialog => dialog.accept())
-  await page.getByRole('button', { name: 'UIC example', exact: true }).click()
+  await openUic(page)
   await expect(page.getByTestId('slide-counter')).toHaveText('1/10')
+  await page.getByRole('button', { name: 'Source', exact: true }).click()
   await editor.click()
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
   await expect(editor).not.toContainText('draft to preserve')
+  await page.getByRole('tab', { name: 'Welcome.md *', exact: true }).click()
+  await expect(editor).toHaveText('# draft to preserve')
+  page.once('dialog', dialog => dialog.dismiss())
+  await page.getByRole('button', { name: 'Close Welcome.md', exact: true }).click()
+  await expect(editor).toHaveText('# draft to preserve')
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Close Welcome.md', exact: true }).click()
+  await expect(page.getByRole('tab', { name: 'Welcome.md *', exact: true })).toHaveCount(0)
 })

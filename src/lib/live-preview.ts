@@ -146,7 +146,7 @@ class RenderedBlock extends WidgetType {
         image.onerror = () => { image.title = t('imageFailed'); view.requestMeasure() }
         const source = image.getAttribute('src')
         if (desktop && this.options.path && source && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(source)) {
-          void invoke<string>('read_image', { documentPath: this.options.path, relativePath: decodeURIComponent(source) }).then(url => { if (image.isConnected) image.src = url }).catch(() => { image.title = t('imageFailed') })
+          void invoke<string>('read_resource', { documentPath: this.options.path, relativePath: decodeURIComponent(source) }).then(url => { if (image.isConnected) image.src = url }).catch(() => { image.title = t('imageFailed') })
         }
       })
     }
@@ -156,7 +156,13 @@ class RenderedBlock extends WidgetType {
     }
     element.addEventListener('mousedown', event => { event.preventDefault(); edit() })
     element.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); edit() } })
-    return element
+    if (block.kind === 'image') return element
+    // CodeMirror measures the widget's border box, excluding vertical margins.
+    // Keep block spacing inside that measured box so hit testing cannot drift.
+    const wrapper = document.createElement('div')
+    wrapper.className = 'mp-block-wrapper'
+    wrapper.append(element)
+    return wrapper
   }
   ignoreEvent() { return true }
   get estimatedHeight() { return this.block.kind === 'image' ? 140 : this.block.kind === 'table' ? 140 : this.block.kind === 'code' ? 100 : 36 }
