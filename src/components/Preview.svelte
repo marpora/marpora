@@ -33,6 +33,10 @@
 
   $effect(() => {
     void ready
+    if (frame) {
+      if (mode === 'slides') frame.tabIndex = -1
+      else frame.removeAttribute('tabindex')
+    }
     const root = frame?.contentDocument?.documentElement
     if (root) { root.lang = language; root.dataset.theme = scheme; root.dataset.accent = accent }
   })
@@ -93,6 +97,6 @@
     <div class="empty-preview"><h2>{t('emptySlides')}</h2><p>{t('emptySlidesHint')}</p></div>
   {:else}
     <!-- Scripts stay disabled; same-origin access is only for navigation and scaling. -->
-    <iframe bind:this={frame} title={mode === 'slides' ? t('slidePreview') : t('documentPreview')} sandbox="allow-same-origin" tabindex={mode === 'slides' ? -1 : undefined} srcdoc={doc} onload={loaded} class:slide-frame={mode === 'slides'} style:--slide-ratio={result.aspectRatio || 16 / 9}></iframe>
+    <iframe bind:this={frame} title={mode === 'slides' ? t('slidePreview') : t('documentPreview')} sandbox="allow-same-origin" srcdoc={doc} onload={loaded} class:slide-frame={mode === 'slides'} style:--slide-ratio={result.aspectRatio || 16 / 9}></iframe>
   {/if}
 </div>
