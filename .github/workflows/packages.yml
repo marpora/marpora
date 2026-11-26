@@ -52,6 +52,12 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - name: Build app and DMG
         run: npm run desktop:build -- --target ${{ matrix.target }} --bundles app,dmg
+      - name: Verify app signature and disk image
+        run: |
+          codesign --verify --deep --strict --verbose=2 "src-tauri/target/${{ matrix.target }}/release/bundle/macos/Marpora.app"
+          for disk_image in src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg; do
+            hdiutil verify "$disk_image"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: Marpora-${{ matrix.name }}
