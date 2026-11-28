@@ -7,6 +7,7 @@
 @import url('./tokens.css');
 @import url('./base.css');
 @import url('./themes.css');
+@import url('./components/template-library.css');
 
 :root {
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -110,19 +111,6 @@ iframe { display: block; width: 100%; height: 100%; border: none; background: va
 .preview-only { grid-template-columns: minmax(0, 1fr); }
 .preview-only .editor-pane, .preview-only .splitter { display: none; }
 .preview-only .preview-content:not(:has(.slide-stage)) { max-width: 1000px; width: 100%; margin-inline: auto; }
-.presenting { position: fixed; inset: 0; z-index: var(--z-modal); max-width: none; background: var(--color-presentation); }
-.presenting .toolbar, .presenting .editor-pane, .presenting .splitter, .presenting .pane-heading, .presenting .deck-heading, .presenting .slide-strip, .presenting .speaker-notes { display: none; }
-.presenting .workspace { grid-template-columns: minmax(0, 1fr); }
-.presenting .preview-pane { display: flex; }
-.presenting .preview-content, .presenting .slide-stage { background: var(--color-presentation); }
-.presenting .slide-stage { padding: var(--space-xl) var(--space-2xl) 0; justify-content: center; }
-.presenting .slide-frame { max-width: 1600px; width: min(100%, calc((100dvh - 170px) * var(--slide-ratio, 16 / 9))); }
-.presenting .slide-navigation { color: var(--color-accent-ink); }
-.presenting .slide-navigation button:hover { background: var(--color-ink-2); }
-.presenting .statusbar { background: var(--color-presentation); color: var(--color-accent-ink); border-color: var(--color-ink-2); }
-.presenting .statusbar-center { color: var(--color-accent-ink); }
-.exit-presentation { position: absolute; right: var(--space-lg); top: var(--space-sm); min-height: 34px; color: var(--color-accent-ink); font-size: 12px; }
-.exit-presentation:hover { background: var(--color-ink-2); }
 kbd { font-family: var(--font-code); margin-left: var(--space-xs); opacity: .6; }
 @media (max-width: 1000px) {
   .toolbar { gap: var(--space-sm); padding-inline: var(--space-md); }
@@ -148,8 +136,6 @@ kbd { font-family: var(--font-code); margin-left: var(--space-xs); opacity: .6; 
   .slide-stage { padding: var(--space-sm); }
   .slide-strip { padding: var(--space-xs); }
   .slide-strip button { flex-basis: 105px; padding: var(--space-xs); }
-  .presenting .workspace { grid-template-rows: minmax(0, 1fr) !important; }
-  .presenting .slide-stage { padding: var(--space-xl) var(--space-sm) 0; }
 }
 
 .preferences-anchor { position: relative; }
@@ -239,10 +225,64 @@ kbd { font-family: var(--font-code); margin-left: var(--space-xs); opacity: .6; 
 .pdf-canvas-wrap{overflow:auto;flex:1;position:relative;padding:28px;background:var(--color-paper-2)}
 .pdf-canvas-wrap canvas{display:block;margin:0 auto;background:white;box-shadow:0 1px 5px #0002}
 .pdf-loading{position:sticky;top:0;left:0;padding:5px 10px;background:var(--color-paper-3);font-size:12px}
-.presenting .folder-sidebar,.presenting .tab-strip{display:none}
 @media(max-width:900px){.folder-sidebar{width:190px}
 .toolbar .brand span{display:none}
 }
 @media(max-width:700px){.folder-sidebar{width:155px}
 .folder-sidebar .pane-heading{padding:0 4px}
 }
+
+/* Dual-screen presenter. Native WebViews share only the rendered audience deck. */
+.app-shell.presenter-active { display: none; }
+.presentation-dialog-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #090d1580; padding: 24px; }
+.presentation-dialog { width: min(480px, 100%); padding: 28px; background: var(--color-paper); color: var(--color-ink); border: 1px solid var(--color-rule); border-radius: 12px; box-shadow: 0 20px 80px #0004; }
+.presentation-dialog h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: -.4px; }
+.presentation-dialog p { margin: 10px 0 20px; color: var(--color-muted); line-height: 1.65; }
+.presentation-dialog label { display: block; margin: 24px 0 8px; font-weight: 600; }
+.presentation-dialog select { width: 100%; padding: 10px; border: 1px solid var(--color-rule); border-radius: 5px; background: var(--color-paper-2); color: var(--color-ink); }
+.presentation-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.presentation-primary { min-height: 36px; padding: 0 16px; background: var(--color-accent); color: white; }
+.presentation-primary:hover { background: var(--color-accent); filter: brightness(1.1); }
+.presentation-dialog .presentation-error { color: var(--color-warning-ink); }
+.presentation-surface { display: block; width: 100%; height: 100%; border: 0; pointer-events: none; background: #090d15; }
+.audience-shell { position: fixed; inset: 0; background: #090d15; color: #eee; overflow: hidden; }
+.audience-slide { width: 100%; height: 100%; }
+.audience-message { display: grid; place-items: center; height: 100%; padding: 48px; text-align: center; font-size: 18px; }
+.presenter-console { position: fixed; inset: 0; display: grid; grid-template-rows: 66px minmax(0, 1fr) 44px 6px var(--presenter-strip); background: var(--color-paper-2); color: var(--color-ink); }
+.presenter-toolbar { display: flex; align-items: center; gap: 24px; padding: 0 20px; border-bottom: 1px solid var(--color-rule); background: var(--color-paper); }
+.presenter-toolbar > div:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.presenter-toolbar strong { font-size: 14px; }
+.presenter-toolbar > div:first-child > span { color: var(--color-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
+.presenter-toolbar button { min-height: 32px; padding: 0 10px; font-size: 12px; }
+.presenter-clock { display: flex; align-items: center; gap: 4px; }
+.presenter-clock output { font: 26px/1 var(--font-code); font-variant-numeric: tabular-nums; letter-spacing: -1px; margin-right: 12px; }
+.presenter-end { border: 1px solid var(--color-rule); }
+.presenter-end kbd { font-size: 10px; color: var(--color-muted); margin-left: 8px; }
+.presenter-body { display: grid; grid-template-columns: minmax(0, var(--presenter-columns)) 6px minmax(0, 1fr); min-height: 0; }
+.presenter-current, .presenter-next, .presenter-notes { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 16px; }
+.presenter-body h2 { margin: 0 0 12px; font-size: 11px; color: var(--color-muted); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+.presenter-slide-space { display: flex; flex: 1; min-height: 0; }
+.presenter-slide { width: 100%; height: 100%; overflow: hidden; border: 1px solid var(--color-rule); border-radius: 4px; background: #090d15; }
+.presenter-side { display: grid; grid-template-rows: minmax(0, var(--presenter-next)) 6px minmax(0, 1fr); min-height: 0; }
+.presenter-next { padding-bottom: 12px; }
+.presenter-notes { background: var(--color-paper); }
+.presenter-notes > div { flex: 1; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 16px; user-select: text; }
+.presenter-last { display: grid; flex: 1; place-items: center; color: var(--color-muted); background: var(--color-paper); border: 1px dashed var(--color-rule); }
+.presenter-handle { padding: 0; margin: 0; border-radius: 0; background: var(--color-rule); touch-action: none; }
+.presenter-handle:hover, .presenter-handle:focus-visible { background: var(--color-accent); }
+.presenter-column-handle { cursor: col-resize; }
+.presenter-row-handle, .presenter-strip-handle { cursor: row-resize; }
+.presenter-navigation { display: flex; align-items: center; gap: 16px; padding: 0 16px; border-top: 1px solid var(--color-rule); font-variant-numeric: tabular-nums; user-select: none; }
+.presenter-navigation button { width: 32px; height: 32px; border: 1px solid var(--color-rule); }
+.presenter-step { color: var(--color-muted); min-width: 76px; font-size: 11px; }
+.presenter-key-hint { margin-left: auto; font-size: 11px; color: var(--color-muted); }
+.presenter-thumbnails { overflow: auto hidden; background: var(--color-paper); padding-top: 10px; }
+.presenter-thumbnail-track { position: relative; height: 100%; }
+.presenter-thumbnail-surface { width: 100%; }
+.presenter-thumbnail { position: absolute; top: 0; border: 2px solid var(--color-rule); border-radius: 3px; padding: 0; }
+.presenter-thumbnail:hover { background: transparent; border-color: var(--color-muted); }
+.presenter-thumbnail.current { outline: 2px solid var(--color-accent); outline-offset: 2px; border-color: var(--color-accent); }
+.presenter-thumbnail > span { position: absolute; top: calc(100% + 7px); left: 0; max-width: 100%; color: var(--color-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+.presenter-thumbnail.current > span { color: var(--color-accent); }
+.presenter-waiting { position: absolute; z-index: 10; top: 72px; left: 20px; padding: 10px 16px; background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: 5px; }
+@media (max-width: 900px) { .presenter-toolbar { gap: 10px; padding: 0 12px; } .presenter-current, .presenter-next, .presenter-notes { padding: 10px; } .presenter-end kbd, .presenter-key-hint { display: none; } .presenter-notes > div { font-size: 14px; } }

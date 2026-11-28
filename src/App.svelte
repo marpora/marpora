@@ -1,5 +1,12 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
+  import TemplateLibrary from './components/TemplateLibrary.svelte'
+  import { builtins, importPack, loadLibrary } from './lib/template-library'
+  import { applyTheme, type ThemePack } from './lib/theme-pack'
+  import Presenter from './components/Presenter.svelte'
+  import PresentationSetup from './components/PresentationSetup.svelte'
+  import { PresentationHost } from './lib/presentation-host'
+  import { keyAction, type PresenterSession } from './lib/presentation'
   import Logo from './components/Logo.svelte'
   import Editor from './components/Editor.svelte'
   import Preview from './components/Preview.svelte'
@@ -19,6 +26,9 @@
 
   const initialPreferences = loadPreferences()
   let preferences = $state(initialPreferences)
+  let templatesOpen = $state(false), templateInitial = $state(builtins[0].id), themeRevision = $state(0)
+  let templatePacks = $state<ThemePack[]>([...builtins])
+  let templatesButton = $state<HTMLButtonElement>()
   let preferencesOpen = $state(false)
   let exportOpen = $state(false)
   let systemDark = $state(window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -36,7 +46,7 @@
   let sidebar = $state(false)
   let folderRevision = $state(0)
   let line = $state(1), column = $state(1), offset = $state(0), progress = $state(0)
-  let sync = $state(true), wrap = $state(true), step = $state(0), presenting = $state(false), showNotes = $state(false)
+  let sync = $state(true), wrap = $state(true), step = $state(0), showNotes = $state(false)
   let busy = $state(false), fileBusy = $state(false), exporting = $state(false), error = $state(''), recovered = $state(false)
   let exported = $state<string | null>(null)
   let result = $state<RenderedPreview>({ html: '', css: '', titles: [], notes: [], theme: 'Markdown' })
@@ -46,6 +56,10 @@
   let workspace = $state<HTMLDivElement>()
   let renderGeneration = 0
   let renderedId = ''
+  let presenterSetup = $state(false), presenterStarting = $state(false)
+  let presenterSession = $state<PresenterSession | null>(null)
+  let presenterHost: PresentationHost | null = null
+  let presentButton = $state<HTMLButtonElement>()
   let closing = false
   const dirty = $derived(isDirty(active))
   const currentMode = $derived(active.kind === 'html' ? renderedMode : effectiveMode(text, mode))
@@ -56,6 +70,7 @@
 
   $effect(() => {
     const id = active.id, source = active.text, kind = active.kind, target = effectiveMode(source, active.mode), css = active.themeCss, language = preferences.language
+    void themeRevision
     const generation = ++renderGeneration
     untrack(() => { if (renderedId !== id) { result = { html: '', css: '', titles: [], notes: [], theme: kind === 'html' ? 'HTML' : 'Markdown' }; renderedId = id } })
     if (kind === 'pdf') { busy = false; return }
@@ -164,9 +179,30 @@
     } catch (cause) { error = t('saveFailed', { error: errorMessage(cause, preferences.language) }); return false }
     finally { fileBusy = false }
   }
+  function showTemplates() { templateInitial = builtins[0].id; templatesOpen = true; preferencesOpen = false; exportOpen = false }
+  function closeTemplates() { templatesOpen = false; requestAnimationFrame(() => templatesButton?.focus({ preventScroll: true })) }
+  async function importTemplate(): Promise<ThemePack | null> {
+    const source = await loadTheme(preferences.language)
+    if (!source) return null
+    const pack = await importPack(source)
+    templatePacks = [...await loadLibrary()]; themeRevision++
+    return pack
+  }
+  function createTemplate(pack: ThemePack) {
+    const tab = newTab(pack.starter.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'), `${pack.name.en}.md`)
+    tab.lineEnding = pack.starter.includes('\r\n') ? 'crlf' : 'lf'; tab.bom = pack.starter.startsWith('\uFEFF')
+    tab.savedText = null; tabs.push(tab); activate(tab.id); templatesOpen = false
+    requestAnimationFrame(() => editor?.focus())
+  }
+  function applyTemplate(pack: ThemePack) {
+    try {
+      const next = applyTheme(active.text, pack.theme)
+      if (!editor?.replaceSource(next)) return
+      active.mode = 'slides'; active.themeCss = ''; templatesOpen = false; error = ''
+    } catch (cause) { error = errorMessage(cause, preferences.language); templatesOpen = false }
+  }
   async function theme() {
-    const tab = active
-    try { const css = await loadTheme(preferences.language); if (css && !/@theme\s+([\w-]+)/.test(css)) { error = t('themeMetadata'); return }; if (css) tab.themeCss = css }
+    try { const pack = await importTemplate(); if (pack) { templateInitial = pack.id; templatesOpen = true } }
     catch (cause) { error = t('themeFailed', { error: errorMessage(cause, preferences.language) }) }
   }
   async function exportFile(format: 'html' | 'pdf') {
@@ -197,11 +233,37 @@
     }
   }
   function go(index: number) { active.slide = Math.max(0, Math.min(index, slideCount - 1)); step = 0 }
-  function next() { const max = preview?.fragmentCount() || 0; if (presenting && step < max) step++; else go(slide + 1) }
-  function previous() { if (presenting && step > 0) step--; else go(slide - 1) }
-  function togglePresentation() { presenting = !presenting; step = presenting ? 0 : Number.MAX_SAFE_INTEGER }
+  function next() { go(slide + 1) }
+  function previous() { go(slide - 1) }
+  async function startPresentation(monitorId: string | null) {
+    if (presenterHost || presenterStarting || busy || fileBusy || exporting || !slideCount) return
+    presenterStarting = true; error = ''
+    const tabId = activeId
+    const host = new PresentationHost({ result, path, title: label, language: preferences.language, slide, monitorId }, session => {
+      presenterSession = session; presenterSetup = false
+    }, (reason, lastSlide) => {
+      if (presenterHost !== host) return
+      presenterSession = null; presenterSetup = false; presenterStarting = false; presenterHost = null
+      const tab = tabs.find(tab => tab.id === tabId)
+      if (tab) tab.slide = lastSlide
+      if (reason === 'display-disconnected') error = t('displayDisconnected')
+      requestAnimationFrame(() => presentButton?.focus({ preventScroll: true }))
+    }, cause => { error = t('presenterFailed', { error: errorMessage(cause, preferences.language) }); if (presenterHost === host) void host.stop('failed') })
+    presenterHost = host
+    try { await host.start() }
+    catch (cause) { if (presenterHost === host) { await host.stop(); }; error = t('presenterFailed', { error: errorMessage(cause, preferences.language) }) }
+    finally { presenterStarting = false }
+  }
+  function cancelPresentation() {
+    presenterSetup = false
+    if (presenterStarting) void presenterHost?.stop()
+    presentButton?.focus({ preventScroll: true })
+  }
   function keyboard(event: KeyboardEvent, fromPreview = false) {
     if (event.isComposing) return
+    if (templatesOpen) { if (event.key === 'Escape') { event.preventDefault(); closeTemplates() }; return }
+    if (presenterSession) { const action = keyAction(event); if (action) { event.preventDefault(); presenterHost?.action(action) }; return }
+    if (presenterSetup) { if (event.key === 'Escape') { event.preventDefault(); cancelPresentation() }; return }
     if (event.key === 'Escape') { preferencesOpen = false; exportOpen = false }
     const mod = event.metaKey || event.ctrlKey
     if (mod && event.key === '/' && active.kind === 'markdown') { event.preventDefault(); active.editing = editing === 'live' ? 'source' : 'live'; if (layout === 'preview') active.layout = 'editor' }
@@ -210,8 +272,7 @@
     else if (mod && event.key.toLowerCase() === 'n') { event.preventDefault(); sample('empty') }
     else if (mod && event.key.toLowerCase() === 'w') { event.preventDefault(); void closeTab(activeId) }
     else if (event.ctrlKey && event.key === 'Tab') { event.preventDefault(); const index = tabs.findIndex(tab => tab.id === activeId); activate(tabs[(index + (event.shiftKey ? tabs.length - 1 : 1)) % tabs.length].id) }
-    else if (event.key === 'Escape' && presenting) { event.preventDefault(); presenting = false; step = Number.MAX_SAFE_INTEGER }
-    else if ((presenting || (currentMode === 'slides' && (fromPreview || (event.target instanceof Element && !!event.target.closest('.preview-pane'))))) && !mod && !event.altKey && !event.shiftKey) {
+    else if ((currentMode === 'slides' && (fromPreview || (event.target instanceof Element && !!event.target.closest('.preview-pane')))) && !mod && !event.altKey && !event.shiftKey) {
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); next() }
       if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); previous() }
       if (event.key === 'Home') { event.preventDefault(); go(0) }
@@ -230,8 +291,9 @@
       if (!drafts.length) { const old = JSON.parse(localStorage.getItem('marpora.draft.v1') || 'null'); if (old?.dirty && typeof old.text === 'string') drafts = restoreDrafts({ tabs: [old] }) }
       if (drafts.length) { tabs = drafts; activeId = drafts.find(tab => tab.id === stored?.activeId)?.id || drafts[0].id; recovered = true }
     } catch { /* Ignore damaged optional drafts. */ }
+    void loadLibrary().then(packs => { templatePacks = [...packs]; themeRevision++ })
     initialized = true
-    if (!desktop) return () => media.removeEventListener('change', updateSystemTheme)
+    if (!desktop) return () => { void presenterHost?.stop(); media.removeEventListener('change', updateSystemTheme) }
     const cleanups: Array<() => void> = []; let disposed = false
     void (async () => {
       const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -242,6 +304,7 @@
         if (await confirmDiscard(true)) { closing = true; tabs.forEach(tab => tab.savedText = tab.text); try { localStorage.removeItem(draftKey) } catch { /* Optional storage. */ }; await getCurrentWindow().destroy() }
       })
       const menu = await listen<string>('menu-action', ({ payload }) => {
+        if ((presenterSession || presenterSetup || templatesOpen) && payload !== 'quit') return
         if (payload === 'open') void open()
         if (payload === 'open-folder') void chooseFolder()
         if (payload === 'save') void save()
@@ -252,18 +315,18 @@
         if (payload === 'export-pdf') void exportFile('pdf')
         if (payload === 'quit') void getCurrentWindow().close()
       })
-      const drop = await listen<OpenDocument>('document-dropped', ({ payload }) => add(payload))
-      const folderDrop = await listen<Folder>('folder-dropped', ({ payload }) => { folder = payload; sidebar = true; folderRevision++ })
+      const drop = await listen<OpenDocument>('document-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup && !templatesOpen) add(payload) })
+      const folderDrop = await listen<Folder>('folder-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup && !templatesOpen) { folder = payload; sidebar = true; folderRevision++ } })
       const failure = await listen<string>('document-error', ({ payload }) => { error = errorMessage(payload, preferences.language) })
       if (disposed) [close, menu, drop, folderDrop, failure].forEach(fn => fn()); else cleanups.push(close, menu, drop, folderDrop, failure)
     })()
-    return () => { disposed = true; cleanups.forEach(fn => fn()); media.removeEventListener('change', updateSystemTheme) }
+    return () => { disposed = true; void presenterHost?.stop(); cleanups.forEach(fn => fn()); media.removeEventListener('change', updateSystemTheme) }
   })
 </script>
 
-<svelte:window onpointerdown={(event) => { if (!(event.target as Element).closest('.preferences-anchor')) preferencesOpen = false; if (!(event.target as Element).closest('.export-anchor')) exportOpen = false }} onkeydown={keyboard} onbeforeunload={beforeUnload} onpointermove={resize} onpointerup={() => dragging = false} />
+<svelte:window onpointerdown={(event) => { if (!(event.target as Element).closest('.preferences-anchor')) preferencesOpen = false; if (!(event.target as Element).closest('.export-anchor')) exportOpen = false }} onkeydown={keyboard} onbeforeunload={beforeUnload} onpagehide={() => { void presenterHost?.stop() }} onpointermove={resize} onpointerup={() => dragging = false} />
 
-<div class="app-shell" class:presenting class:resizing={dragging}>
+<div class="app-shell" class:presenter-active={!!presenterSession} class:resizing={dragging} inert={presenterSetup || !!presenterSession || templatesOpen}>
   <header class="toolbar">
     <div class="brand" aria-label="Marpora">
       <Logo/>
@@ -281,6 +344,7 @@
     </div>
     <div class="document-name" title={path || label}><span>{label}</span>{#if dirty}<span class="unsaved" aria-label={t('unsaved')}>{t('unsaved')}</span>{/if}</div>
     <div class="toolbar-end">
+      <button type="button" class="quiet-button" bind:this={templatesButton} onclick={showTemplates} disabled={fileBusy || exporting}>{t('templates')}</button>
       <div class="preferences-anchor">
         <button class="icon-button" aria-label={t('preferences')} title={t('preferences')} aria-expanded={preferencesOpen} onclick={() => preferencesOpen = !preferencesOpen}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg></button>
         {#if preferencesOpen}<PreferencesPanel value={preferences} onchange={(value) => preferences = value} onclose={() => preferencesOpen = false}/>{/if}
@@ -343,14 +407,14 @@
 
       <div class="preview-content">
         {#if currentMode === 'slides'}
-          <div class="deck-heading"><span>{result.theme}</span><button class="quiet-button" onclick={togglePresentation} disabled={slideCount === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z"/></svg>{t('present')}</button></div>
+          <div class="deck-heading"><span>{result.theme}</span><button class="quiet-button" bind:this={presentButton} onclick={() => { preferencesOpen = false; exportOpen = false; presenterSetup = true }} disabled={slideCount === 0 || busy || fileBusy || exporting || !!result.warning}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z"/></svg>{t('present')}</button></div>
         {/if}
-        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={presenting ? step : Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={event => keyboard(event, true)} language={preferences.language} {scheme} accent={preferences.accent}/>
+        <Preview bind:this={preview} {result} mode={renderedMode} {slide} step={Number.MAX_SAFE_INTEGER} {path} {progress} {sync} onkey={event => keyboard(event, true)} language={preferences.language} {scheme} accent={preferences.accent}/>
         {#if currentMode === 'slides'}
           <div class="slide-navigation">
             <button class="icon-button" aria-label={t('previousSlide')} onclick={previous} disabled={slide === 0 && step === 0}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>
             <span data-testid="slide-counter">{slideCount ? slide + 1 : 0}<span class="counter-separator">/</span>{slideCount}</span>
-            <button class="icon-button" aria-label={t('nextSlide')} onclick={next} disabled={slide >= slideCount - 1 && (!presenting || step >= (preview?.fragmentCount() || 0))}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
+            <button class="icon-button" aria-label={t('nextSlide')} onclick={next} disabled={slide >= slideCount - 1}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
             <button class="notes-toggle" class:enabled={showNotes} aria-pressed={showNotes} onclick={() => showNotes = !showNotes}>{t('notes')}</button>
           </div>
           {#if showNotes}<div class="speaker-notes"><span>{t('speakerNotes')}</span><p>{notes || t('noNotes')}</p></div>{/if}
@@ -367,8 +431,12 @@
   </div>
   <footer class="statusbar">
     <div><span>{active.kind === 'markdown' ? t('characters', { count: characters.toLocaleString(preferences.language) }) : t('readOnly')}</span><span class="cursor-position" class:read-only={active.kind !== 'markdown'}>{t('cursor', { line, column })}</span></div>
-    <div class="statusbar-center">{presenting ? t('presentationHint') : currentMode === 'slides' ? t('slideCount', { count: slideCount }) : t('localWriting')}</div>
+    <div class="statusbar-center">{currentMode === 'slides' ? t('slideCount', { count: slideCount }) : t('localWriting')}</div>
     <div><button class:enabled={sync} aria-pressed={sync} onclick={() => sync = !sync} title={currentMode === 'slides' ? t('syncSlides') : t('syncScroll')}>{sync ? t('syncOn') : t('syncOff')}</button><span>UTF-8{bom ? ' BOM' : ''}</span><span>{lineEnding.toUpperCase()}</span></div>
   </footer>
-  {#if presenting}<button class="exit-presentation" onclick={togglePresentation}>{t('exitPresentation')} <kbd>Esc</kbd></button>{/if}
 </div>
+
+{#if presenterSetup}<PresentationSetup language={preferences.language} starting={presenterStarting} onstart={startPresentation} onclose={cancelPresentation}/>{/if}
+{#if presenterSession}<Presenter session={presenterSession} onshowaudience={() => presenterHost?.showAudience()} onaction={action => presenterHost?.action(action)}/>{/if}
+
+{#if templatesOpen}<TemplateLibrary language={preferences.language} packs={templatePacks} initialId={templateInitial} canApply={active.kind === 'markdown' && !!editor} oncreate={createTemplate} onapply={applyTemplate} onimport={importTemplate} onclose={closeTemplates}/>{/if}

@@ -1,7 +1,7 @@
 {
   "name": "marpora",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "predev": "node scripts/sync-pdf-assets.mjs",
@@ -16,7 +16,9 @@
     "desktop": "tauri dev",
     "desktop:build": "tauri build",
     "test:interaction": "playwright test --config playwright.interaction.config.ts",
-    "test:release": "node --test tests/release.test.mjs"
+    "test:release": "node --test tests/release.test.mjs",
+    "templates:catalog": "node scripts/build-template-catalog.mjs",
+    "templates:previews": "node scripts/capture-templates.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.1",

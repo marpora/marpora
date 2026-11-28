@@ -29,3 +29,21 @@ macOS builds compile a small Swift helper in `build.rs` for the target architect
 Windows/Linux use supported standard installation paths for an existing Chrome/Edge/Chromium, with a separate temporary profile and headless printing. macOS can fall back to an existing browser if native export fails. No browser downloader, Node runtime or Chromium binary is distributed. Platform/browser rendering differences still require platform tests.
 
 The application CSP permits local worker execution and WASM for PDF decoding. This does not change the script-free preview iframe policy. Referenced remote images/fonts may use the network; the application itself has no telemetry or hosted API.
+
+## Dual-screen Presenter
+
+The existing main window becomes a presenter console while its editor remains mounted and hidden. A dedicated audience WebView is created through Rust on the selected display using physical monitor coordinates; windowed rehearsal is also supported. Display identifiers include geometry and scale and are revalidated before opening and during the session. Closing either window or losing the projection display cleans up the session. Each audience window has a unique session label, so delayed destroy events cannot end a newer presentation.
+
+The main frontend owns a frozen rendered deck, slide/fragment reducer and monotonic elapsed timer. Audience keyboard commands return to that controller; only the controller increments position revisions. Rust stores the latest bounded position and ignores older revisions, and the audience subscribes before requesting its initial snapshot. Reopening/reloading the audience therefore cannot roll back a newer position. Reverse navigation goes through fragments and restores all fragments when returning to the previous slide. Thumbnail jumps reset fragments on the target slide.
+
+Audience snapshots explicitly omit speaker notes and source paths. Local images and CSS resources are embedded once per session; audience frames contain sanitized slide markup and cannot execute authored scripts. Standard Marp HTML notes are extracted separately from SVGs. The current slide, next slide and thumbnail strip reuse the same script-free surface and official Marpit SVG polyfill. All thumbnails share one frame rather than allocating one WebView/frame per slide. The UIC presenter extension informed the resizable panes, double-click reset, persistent layout and synchronized thumbnail interaction; its MIT license remains in `examples/uic/LICENSE`.
+
+Browser development uses a separate pop-up and a session-scoped BroadcastChannel instead of native commands. It has the same authoritative reducer and revision checks, but no monitor selection. No HTTP/WebSocket server, browser engine download or new runtime dependency is introduced. Presenter Pro features such as remote control, annotations and countdowns are outside this basic implementation.
+
+## Template library and package v1
+
+Built-in themes are data directories under `templates/`: a manifest, CSS, starter Markdown and a real rendered cover. The renderer registers bundled and locally installed themes. The library uses the same script-free slide surface for sample navigation and creates independent unsaved tabs. Applying a theme uses the YAML scalar source range and a minimal CodeMirror transaction, preserving selection mapping and undo history. No YAML serializer runs.
+
+Portable JSON packs carry a publisher-qualified ID, version, author, license, localized metadata, CSS and starter Markdown. Imports validate the schema, resource destinations, minimum app version and Marp CSS syntax before a transaction writes to IndexedDB. Duplicate IDs/names and reserved built-in names cannot be overwritten. Optional stored entries are revalidated on startup and isolated if damaged. Starter BOM/CRLF is retained in the new document's encoding metadata. The export/import bridge uses the native file picker and atomic writes; the audience window cannot invoke the pack save command.
+
+`npm run templates:catalog` builds a host-independent static catalog with immutable versioned files, byte lengths and SHA-256. The desktop client does not auto-fetch it in v0.4.0. Payments, entitlements and creator payouts belong to a separate future service; see the [platform design](template-platform.md).

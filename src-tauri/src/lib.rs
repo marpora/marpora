@@ -13,6 +13,7 @@ use tauri::{
 };
 use tauri_plugin_dialog::DialogExt;
 mod export;
+mod presenter;
 mod workspace;
 
 const MAX_DOCUMENT: u64 = 16 * 1024 * 1024;
@@ -219,7 +220,7 @@ async fn open_theme(app: tauri::AppHandle) -> Result<Option<String>, String> {
         let Some(selected) = app
             .dialog()
             .file()
-            .add_filter("Marp theme", &["css"])
+            .add_filter("Marp theme or Marpora pack", &["css", "json"])
             .blocking_pick_file()
         else {
             return Ok(None);
@@ -228,6 +229,38 @@ async fn open_theme(app: tauri::AppHandle) -> Result<Option<String>, String> {
         let text =
             String::from_utf8(read_limited(&path, 2 * 1024 * 1024)?).map_err(|e| e.to_string())?;
         Ok(Some(text))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn save_theme_pack(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    suggested_name: String,
+    content: String,
+) -> Result<bool, String> {
+    if window.label() != "main"
+        || content.len() > 2 * 1024 * 1024
+        || suggested_name.len() > 120
+        || suggested_name.contains(['/', '\\'])
+    {
+        return Err("MAR_PORA:invalidThemePack".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(selected) = app
+            .dialog()
+            .file()
+            .set_file_name(&suggested_name)
+            .add_filter("Marpora theme pack", &["json"])
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let path = selected.into_path().map_err(|e| e.to_string())?;
+        write_document(&path, &content, None, "lf", false)?;
+        Ok(true)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -409,12 +442,14 @@ fn set_language(app: tauri::AppHandle, language: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Documents::default())
+        .manage(presenter::Presentation::default())
         .manage(workspace::Folders::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             open_document,
             save_document,
             open_theme,
+            save_theme_pack,
             read_image,
             set_language,
             workspace::open_folder,
@@ -422,13 +457,28 @@ pub fn run() {
             workspace::open_workspace_file,
             workspace::read_document,
             workspace::read_resource,
-            export::export_document
+            export::export_document,
+            presenter::presentation_displays,
+            presenter::presentation_open,
+            presenter::presentation_snapshot,
+            presenter::presentation_focus,
+            presenter::presentation_update,
+            presenter::presentation_action,
+            presenter::presentation_ready,
+            presenter::presentation_close,
+            presenter::presentation_health
         ])
         .menu(|app| build_menu(app, "en"))
         .on_menu_event(|app, event| {
             let _ = app.emit("menu-action", event.id().as_ref());
         })
         .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                presenter::window_destroyed(window);
+            }
+            if window.label() != "main" {
+                return;
+            }
             if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
                 let paths = paths.clone();
                 let app = window.app_handle().clone();

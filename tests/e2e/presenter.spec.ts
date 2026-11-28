@@ -1,0 +1,146 @@
+import { expect, test, type Page } from '@playwright/test'
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+const uic = readFileSync(new URL('../../examples/uic/example.md', import.meta.url), 'utf8')
+async function openDeck(page: Page, source = uic) {
+  await page.goto('/')
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await (await chooser).setFiles({ name: 'presenter.md', mimeType: 'text/markdown', buffer: Buffer.from(source) })
+  await expect(page.getByTestId('slide-counter')).toHaveText(source === uic ? '1/10' : '1/3')
+}
+async function start(page: Page) {
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Audience display')).toHaveValue('')
+  const popup = page.waitForEvent('popup')
+  await page.getByRole('button', { name: 'Start presentation', exact: true }).click()
+  const audience = await popup
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
+  await expect(audience.getByTestId('audience')).toHaveAttribute('data-slide', '0')
+  return audience
+}
+async function synchronized(page: Page, audience: Page, slide: number, step: number) {
+  for (const [target, id] of [[page, 'presenter'], [audience, 'audience']] as const) {
+    await expect(target.getByTestId(id)).toHaveAttribute('data-slide', String(slide))
+    await expect(target.getByTestId(id)).toHaveAttribute('data-step', String(step))
+  }
+  await expect(audience.getByTestId('audience')).toHaveAttribute('data-revision', (await page.getByTestId('presenter').getAttribute('data-revision'))!)
+}
+
+test('dual-window UIC presentation synchronizes slides, fragments, thumbnails and private notes', async ({ page }) => {
+  const failures: string[] = []
+  page.on('pageerror', error => failures.push(error.message))
+  await openDeck(page)
+  const audience = await start(page)
+  audience.on('pageerror', error => failures.push(error.message))
+  await synchronized(page, audience, 0, 0)
+  await expect(page.getByTestId('presenter-notes')).toContainText('Presenter notes')
+  await expect(audience.locator('body')).not.toContainText('Presenter notes')
+  expect(await audience.locator('iframe').getAttribute('srcdoc')).not.toContain('Presenter notes')
+  await expect(page.getByTitle('Next slide preview').contentFrame().locator('svg.current h2')).toHaveText("Today's plan")
+  await expect(page.getByTitle('Slide thumbnails').contentFrame().locator('svg')).toHaveCount(10)
+  await page.screenshot({ path: 'docs/screenshots/presenter.png' })
+  await page.getByRole('button', { name: '6. Code, then', exact: false }).click()
+  await synchronized(page, audience, 5, 0)
+  const projection = audience.getByTitle('Audience slide').contentFrame()
+  await expect(projection.locator('svg.current .unrevealed')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Next slide', exact: true }).click()
+  await synchronized(page, audience, 5, 1)
+  await expect(projection.locator('svg.current .unrevealed')).toHaveCount(1)
+  await audience.locator('.audience-shell').click()
+  await audience.keyboard.press('ArrowRight')
+  await synchronized(page, audience, 5, 2)
+  await audience.keyboard.press('ArrowDown')
+  await synchronized(page, audience, 6, 0)
+  await page.getByRole('button', { name: 'Previous slide', exact: true }).click()
+  await synchronized(page, audience, 5, 2)
+  // Reload reconnects at the latest revision and leaves the running timer intact.
+  await audience.reload()
+  await synchronized(page, audience, 5, 2)
+  await expect(audience.getByTitle('Audience slide').contentFrame().locator('svg.current .unrevealed')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Pause', exact: true }).click()
+  const frozen = await page.getByTestId('presenter-timer').textContent()
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Reset', exact: true }).click()
+  await expect(page.getByTestId('presenter-timer')).toHaveText('00:00')
+  expect(frozen).toMatch(/\d{2}:\d{2}/)
+  await audience.screenshot({ path: 'docs/screenshots/audience.png' })
+  await audience.keyboard.press('Escape')
+  await expect(page.getByTestId('presenter')).toHaveCount(0)
+  await expect.poll(() => audience.isClosed()).toBe(true)
+  await expect(page.getByTestId('slide-counter')).toHaveText('6/10')
+  await expect(page.getByLabel('Unsaved', { exact: true })).toHaveCount(0)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const chunks: Buffer[] = []
+  for await (const chunk of await (await download).createReadStream()) chunks.push(chunk)
+  expect(Buffer.concat(chunks).toString()).toBe(uic)
+  expect(failures).toEqual([])
+})
+
+test('audience close cleans up, presenter resizes persist, and BOM/CRLF directives survive presenting', async ({ page }) => {
+  const source = '\ufeff---\r\nmarp: true\r\nheadingDivider: 1\r\ncustom: "keep me"\r\n---\r\n# First\r\n\r\n<!-- _class: lead -->\r\n<!-- PRIVATE NOTE -->\r\n\r\n---\r\n# Second\r\n\r\n* reveal me\r\n'
+  await openDeck(page, source)
+  let audience = await start(page)
+  const handle = page.getByRole('button', { name: 'Resize thumbnails', exact: true })
+  await handle.focus(); await page.keyboard.press('ArrowUp')
+  const resized = await page.locator('.presenter-thumbnails').boundingBox()
+  await expect(page.getByTestId('presenter')).toHaveAttribute('data-slide', '0')
+  await audience.close()
+  await expect(page.getByTestId('presenter')).toHaveCount(0)
+  audience = await start(page)
+  const restored = await page.locator('.presenter-thumbnails').boundingBox()
+  expect(restored!.height).toBe(resized!.height)
+  await audience.keyboard.press('End')
+  await synchronized(page, audience, 2, 0)
+  await page.getByRole('button', { name: 'End presentation', exact: false }).click()
+  await expect.poll(() => audience.isClosed()).toBe(true)
+  await expect(page.getByTestId('presenter')).toHaveCount(0)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const chunks: Buffer[] = []
+  for await (const chunk of await (await download).createReadStream()) chunks.push(chunk)
+  expect(Buffer.concat(chunks)).toEqual(Buffer.from(source))
+})
+
+
+test('frozen audience renders granted local images and math while simultaneous commands converge', async ({ page }) => {
+  const root = resolve('test-results/presenter-fixture')
+  mkdirSync(`${root}/slides`, { recursive: true })
+  writeFileSync(`${root}/pixel.svg`, '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="blue"/></svg>')
+  writeFileSync(`${root}/slides/images.md`, '---\nmarp: true\n---\n# Images and math\n\n![pixel](../pixel.svg)\n\n$E=mc^2$\n\n<!-- PRIVATE PRESENTER ONLY -->\n\n---\n# Reveals\n\n* one\n* two\n')
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Toggle sidebar' }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('complementary').getByRole('button', { name: 'Open folder', exact: true }).click()
+  await (await chooser).setFiles(root)
+  const folder = page.getByRole('complementary', { name: 'Folder', exact: true })
+  await folder.getByRole('button', { name: /slides/ }).click()
+  await folder.getByRole('button', { name: /images.md/ }).click()
+  await expect(page.getByTestId('slide-counter')).toHaveText('1/2')
+  const audience = await start(page)
+  const frame = audience.getByTitle('Audience slide').contentFrame()
+  await expect(frame.locator('svg.current img')).toHaveAttribute('src', /^data:image\/svg\+xml/)
+  await expect(frame.locator('svg.current .katex')).toBeVisible()
+  expect(await frame.locator('body').evaluate(async () => (await document.fonts.load('16px KaTeX_Main')).length)).toBeGreaterThan(0)
+  expect(await audience.locator('iframe').getAttribute('srcdoc')).not.toContain('PRIVATE PRESENTER ONLY')
+  // Both windows issue commands before either waits for the next render.
+  await Promise.all([page.keyboard.press('ArrowRight'), audience.keyboard.press('ArrowRight')])
+  await synchronized(page, audience, 1, 1)
+  await Promise.all([page.keyboard.press('ArrowRight'), audience.keyboard.press('ArrowLeft')])
+  await synchronized(page, audience, 1, 1)
+  await page.keyboard.press('Escape')
+  await expect.poll(() => audience.isClosed()).toBe(true)
+})
+
+test('blocked rehearsal popups recover cleanly and do not leave the editor locked', async ({ page }) => {
+  await openDeck(page)
+  await page.evaluate(() => { window.open = () => null })
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  await page.getByRole('button', { name: 'Start presentation', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Allow pop-up windows')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeEnabled()
+  await expect(page.getByLabel('Unsaved', { exact: true })).toHaveCount(0)
+})

@@ -6,14 +6,14 @@ Keep **`marpora/marpora` as the application source**. Its existing URL, issue hi
 | --- | --- | --- |
 | `marpora/marpora` | Desktop source, issues, documentation, builds and releases | Existing |
 | `marpora/.github` | Public organization profile at `profile/README.md`; shared community files when useful | Organization profile |
-| `marpora/marpora.github.io` | Product website, downloads, screenshots and guides | Proposed; not created in this change |
-| `marpora/templates` | Reusable Marp themes, example Markdown, assets, licenses and rendered previews | Proposed; not created in this change |
+| `marpora/website` | Product website, downloads, screenshots and guides | Proposed; not created in this change |
+| `marpora/themes` | Reusable Marp themes, example Markdown, assets, licenses and rendered previews | Proposed; not created in this change |
 
-GitHub Pages uses an organization repository named `<organization>.github.io` for the root site. It can later use a custom domain without renaming the app repository. Website copy and screenshots can iterate separately from desktop releases.
+A separate website repository can be hosted on Cloudflare Workers Static Assets and later use a custom domain without renaming the app repository. Public project documentation may use GitHub Pages, but a future commercial marketplace should use a host intended for that purpose. See [the template platform plan](../template-platform.md).
 
-Start a template catalog as a repository, with one directory per template, a license, source attribution, theme CSS, example Markdown, thumbnail, and compatibility metadata. A website can read that catalog later. Keep engine JavaScript explicitly reviewed and opt-in; theme content should not imply executing an unknown plugin.
+v0.4.0 starts the catalog in `templates/`, with one directory per template, a license, theme CSS, starter Markdown, rendered cover and compatibility metadata. The catalog build command produces portable packages with byte sizes and SHA-256. A separate website can consume this data later. Theme packs contain data only; they do not enable arbitrary engine JavaScript.
 
-The current UIC sample remains an attributed regression fixture in the application while the catalog is planned. No UIC-specific top-level action is needed.
+The current UIC sample remains an attributed regression fixture in the application alongside the new original packs. No UIC-specific top-level action is needed.
 
 ## GitHub copy
 

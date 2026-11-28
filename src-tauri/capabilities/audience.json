@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "audience-window",
+  "description": "Audience windows receive slide state only; file dialogs and editor window operations remain in main.",
+  "windows": ["audience-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

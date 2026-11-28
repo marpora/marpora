@@ -65,7 +65,7 @@ export async function loadTheme(language: Language = 'en'): Promise<string | nul
   return new Promise((resolve, reject) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.css'
+    input.accept = '.css,.json'
     input.onchange = async () => {
       try {
         const file = input.files?.[0]
@@ -91,4 +91,9 @@ export async function resolveImages(frame: HTMLIFrameElement, path: string | nul
       if (image.isConnected) image.setAttribute(attribute, data)
     } catch { image.setAttribute('aria-label', `[${translator(language)('imageFailed')}] ${image.getAttribute('alt') || src}`) }
   }))
+}
+
+export async function saveThemePack(pack: { theme: string }, content: string): Promise<boolean> {
+  if (desktop) return invoke('save_theme_pack', { suggestedName: `${pack.theme}.marpora.json`, content })
+  download(`${pack.theme}.marpora.json`, content, 'application/json'); return true
 }

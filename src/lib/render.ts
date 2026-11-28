@@ -51,10 +51,13 @@ export async function renderPreview(source: string, options: RenderOptions): Pro
 
   marpModule ??= import('@marp-team/marp-core')
   extensionModule ??= import('../../examples/uic/engine/marp-engine.mjs')
-  const [{ Marp }, { default: uicEngine }] = await Promise.all([marpModule, extensionModule])
+  const [{ Marp }, { default: uicEngine }, { loadLibrary }] = await Promise.all([marpModule, extensionModule, import('./template-library')])
   const marp = new Marp({ html: true, script: false, math: 'katex', emoji: { shortcode: true, unicode: false } })
   const { default: uicCss } = await import('../../examples/uic/theme/uic-cs.css?raw')
   marp.themeSet.add(uicCss)
+  for (const pack of await loadLibrary()) {
+    try { marp.themeSet.add(pack.css) } catch { /* A damaged optional theme must not break other decks. */ }
+  }
   if (options.themeCss) marp.themeSet.add(options.themeCss)
   uicEngine({ marp })
   const positions: number[] = []
@@ -115,9 +118,14 @@ export function importHtml(source: string, language: Language = 'en'): { result:
   const slides = Array.from(doc.querySelectorAll('svg[data-marpit-svg]'))
   const css = Array.from(doc.querySelectorAll('style')).map(el => el.textContent || '').join('\n')
   const dimensions = slides[0]?.getAttribute('viewBox')?.split(/\s+/).map(Number)
+  const notes: string[][] = slides.map(() => [])
+  doc.querySelectorAll('.bespoke-marp-note[data-index]').forEach(note => {
+    const index = Number(note.getAttribute('data-index'))
+    if (Number.isInteger(index) && notes[index]) notes[index].push(note.textContent?.trim() || '')
+  })
   const html = slides.length ? `<div>${slides.map(el => el.outerHTML).join('')}</div>` : doc.body.innerHTML
   return {
     mode: slides.length ? 'slides' : 'document',
-    result: { html: sanitizeHtml(html), css: `${css}\n.slides #preview>div>svg{position:relative!important;inset:auto!important;visibility:visible!important;opacity:1!important;transform:translateZ(0)!important}.slides [data-marpit-fragment]{opacity:1!important}`, titles: slides.length ? slideTitles(html, language) : [], notes: [], theme: 'HTML', aspectRatio: dimensions && dimensions[3] > 0 ? dimensions[2] / dimensions[3] : 16 / 9 },
+    result: { html: sanitizeHtml(html), css: `${css}\n.slides #preview>div>svg{position:relative!important;inset:auto!important;visibility:visible!important;opacity:1!important;transform:translateZ(0)!important}.slides [data-marpit-fragment]{opacity:1!important}`, titles: slides.length ? slideTitles(html, language) : [], notes, theme: 'HTML', aspectRatio: dimensions && dimensions[3] > 0 ? dimensions[2] / dimensions[3] : 16 / 9 },
   }
 }
