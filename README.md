@@ -12,6 +12,7 @@ Marpora is an early desktop prototype for writing Markdown and making presentati
 
 - **Live editing:** formatted headings, emphasis, links, lists and quotes. Click rendered code, tables or images to edit the original Markdown. Switch to source mode without losing selection or undo history.
 - **Files and tabs:** open a folder, browse its nested Markdown / HTML / PDF files, and keep multiple documents open. Each Markdown tab retains its own text, undo history, selection and scroll position.
+- **Offline template library:** four original seven-slide packs—Orbit (product launches), Chalk (teaching), Thesis (research) and Brief (business). Preview, create, apply, import and share portable theme packs; installed themes persist locally.
 - **Dual-screen Presenter:** choose a projection display for fullscreen slides; the original window shows the current/next slide, private notes, a pauseable elapsed timer and resizable thumbnail navigation. Slides and fragments synchronize from either window.
 - **Marp previews:** automatic `marp: true` detection, slide navigation, speaker notes, fragments, custom CSS themes and local KaTeX fonts.
 - **HTML and PDF:** open exported Marp HTML as a script-free, read-only slide preview; read PDFs with page navigation and zoom. Export standalone HTML or PDF without changing the Markdown buffer.
@@ -21,6 +22,8 @@ Marpora is an early desktop prototype for writing Markdown and making presentati
 Marp front matter, slide separators, comments and custom directives stay in the original source. Live editing never round-trips a rendered DOM or a rich-text AST back into Markdown.
 
 ## Try it
+
+Choose **Templates** to browse the four included packs. **Create presentation** opens an unsaved deck; **Apply theme** changes only the Markdown theme field in one undoable edit. **Import theme or pack** accepts CSS or a self-contained `.marpora.json` file, and **Download pack** shares a copy. See the [template guide](templates/README.md) and [hosting/marketplace plan](docs/template-platform.md).
 
 Open a Markdown file with **Open**, or choose **Open folder** to browse a workspace. Markdown opens in live editing; a Marp deck opens with a slide preview. The sidebar can be hidden while you write. Use **Export → HTML / PDF** for a copy of the current buffer, including unsaved edits. Exporting does not save the original document.
 
@@ -95,12 +98,12 @@ Playwright uses an installed Chrome on macOS. Elsewhere, run `npx playwright ins
 
 This is a prototype, verified locally on Apple Silicon macOS. The [packaging workflow](.github/workflows/packages.yml) builds Apple Silicon and Intel Mac DMGs on pushes to main, version tags or manual runs. Windows/Linux distribution is planned for a later release; cross-platform source support remains in place. Intel runtime behavior still needs validation on an Intel Mac. Main-branch builds upload DMGs as downloadable Actions artifacts for 30 days. Version tags automatically publish a GitHub Release with both installers and SHA-256 checksums after all builds and verification pass. See [release instructions](docs/releasing.md). Local macOS builds are ad-hoc signed, without Developer ID signing or notarization.
 
-Complex blocks use source editing rather than rich table-cell operations. Arbitrary Marp plugins, editing PDFs/HTML, Finder file associations, a full template gallery and filesystem watching are not implemented. Large-document performance has not been benchmarked; Marp rendering still runs on the UI thread. HTML scripts are intentionally disabled in previews, so third-party JavaScript features are not reproduced. PDF.js renders a canvas, without text selection or a search layer yet.
+Complex blocks use source editing rather than rich table-cell operations. Arbitrary Marp plugins, editing PDFs/HTML, Finder file associations, an online theme store and filesystem watching are not implemented. Large-document performance has not been benchmarked; Marp rendering still runs on the UI thread. HTML scripts are intentionally disabled in previews, so third-party JavaScript features are not reproduced. PDF.js renders a canvas, without text selection or a search layer yet.
 
 The project has no telemetry or cloud sync. Referenced remote images and theme resources can still make network requests. Optional draft recovery uses local WebView storage and does not replace saving to disk.
 
 ## Project
 
-The application stays in **[marpora/marpora](https://github.com/marpora/marpora)**. A future product website can live in `marpora/marpora.github.io`, with reusable themes in a separate `marpora/templates` repository. These are planned destinations, not currently published services. See the [repository plan](docs/github/repository-plan.md).
+The application stays in **[marpora/marpora](https://github.com/marpora/marpora)**. A future product website can live in `marpora/website`, with reusable themes in a separate `marpora/themes` repository. These are planned destinations, not currently published services. See the [repository plan](docs/github/repository-plan.md).
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Marpora is available under the [MIT license](LICENSE). It is an independent project and is not affiliated with Typora or the Marp team.

@@ -51,10 +51,13 @@ export async function renderPreview(source: string, options: RenderOptions): Pro
 
   marpModule ??= import('@marp-team/marp-core')
   extensionModule ??= import('../../examples/uic/engine/marp-engine.mjs')
-  const [{ Marp }, { default: uicEngine }] = await Promise.all([marpModule, extensionModule])
+  const [{ Marp }, { default: uicEngine }, { loadLibrary }] = await Promise.all([marpModule, extensionModule, import('./template-library')])
   const marp = new Marp({ html: true, script: false, math: 'katex', emoji: { shortcode: true, unicode: false } })
   const { default: uicCss } = await import('../../examples/uic/theme/uic-cs.css?raw')
   marp.themeSet.add(uicCss)
+  for (const pack of await loadLibrary()) {
+    try { marp.themeSet.add(pack.css) } catch { /* A damaged optional theme must not break other decks. */ }
+  }
   if (options.themeCss) marp.themeSet.add(options.themeCss)
   uicEngine({ marp })
   const positions: number[] = []

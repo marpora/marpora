@@ -10,6 +10,7 @@
 
 - 原位编辑：标题、强调、链接、列表与引用即时排版；表格、代码、图片点击后编辑原始源码。可随时切换源码，保留选区与撤销记录。
 - 文件夹侧栏：按需展开目录，查看 Markdown、HTML、PDF 文件，点击打开。多个标签分别保留内容、光标、滚动位置与撤销记录。
+- 离线模板库：Orbit 发布会、Chalk 讲课、Thesis 学术、Brief 商务四套原创模板，每套七页及备注。支持搜索、逐页预览、新建文稿、可撤销换主题、主题包导入导出与本机持久保存。
 - 基础双屏 Presenter：选择投影屏幕后，观众窗口全屏展示；主窗口显示当前页、下一页、私密备注、可暂停/重置的计时器和缩略图导航。两个窗口双向同步翻页与 fragment。
 - Marp 实时幻灯片：自动识别 `marp: true`，支持分页、导航、演讲者备注、fragment、自定义主题和本地 KaTeX 字体。
 - 打开已有 HTML / PDF：Marp HTML 按幻灯片显示，普通 HTML 按文档显示；PDF 支持翻页和缩放。二者均为只读预览。
@@ -18,6 +19,8 @@
 - 原生文件保存、另存为、文件/文件夹拖入、多草稿恢复、关闭确认、UTF-8 BOM 与 LF/CRLF 保留。覆盖前检查外部修改，以临时文件替换完成保存。
 
 原始 Markdown 是唯一真源。front matter、分页、注释、自定义指令不会经过富文本 AST 或 HTML 反向序列化，因此切换标签或显示模式不会重排这些内容。
+
+点击 **Templates（模板）** 打开主题库。创建文稿会打开新标签；应用主题仅编辑 Markdown 的 theme 字段，支持撤销。CSS 或完整 `.marpora.json` 包导入后可在本机离线使用。详见[模板指南](templates/README.md)与[主题库托管及创作者分成设计](docs/template-platform.md)。
 
 ## 双屏演示
 
@@ -68,4 +71,4 @@ macOS 浏览器测试使用已安装的 Chrome，其他环境可为开发测试�
 
 尚无表格单元格富文本操作、文件关联、文件监听、模板商城或任意外部 Marp 插件。大文档性能未做基准测试，Marp 渲染仍在前端主线程。没有遥测、云同步；文档中的远程资源仍可能发起网络请求。草稿是本机恢复辅助，不代替正式保存。
 
-应用代码继续放在 `marpora/marpora`；未来产品网站建议放 `marpora/marpora.github.io`，模板集合放 `marpora/templates`，不需要搬迁已有代码。详见[仓库规划](docs/github/repository-plan.md)。MIT 许可，独立项目，与 Typora 和 Marp 团队无隶属关系。
+应用代码继续放在 `marpora/marpora`；未来产品网站建议放 `marpora/website`，模板集合放 `marpora/themes`，不需要搬迁已有代码。详见[仓库规划](docs/github/repository-plan.md)。MIT 许可，独立项目，与 Typora 和 Marp 团队无隶属关系。

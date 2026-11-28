@@ -1,12 +1,27 @@
 {
-  "scanned": "2026-11-25",
+  "scanned": "2026-11-27",
   "scope": "app",
-  "mode": "fast prototype",
-  "findings": { "project": "Empty repository", "material": "User UIC Marp template and working Markdown editor" },
-  "preserve": ["UIC authored slide typography, theme and Markdown source"],
-  "introduce": ["Tauri desktop shell", "quiet dual-pane writing workspace", "local system fonts for offline use"],
-  "theme": "Wayfind, adapted to native app controls",
-  "verification": "Static sloplint plus Playwright screenshots; Hallmark render unavailable without puppeteer-core",
-  "waived": { "47b": "slide-frame is an actual live document iframe, not drawn OS chrome" },
-  "judged": { "F4": "Filled selected segments and slide navigation indicate state; Present is the sole filled action." }
+  "theme": "Existing Marpora tokens and native system typography",
+  "findings": {
+    "tokens": "src/themes.css:1",
+    "shell": "src/app.css:30",
+    "library": "src/components/TemplateLibrary.svelte",
+    "material": "Four original 7-slide Marp decks; actual slide captures, no stock assets"
+  },
+  "preserve": [
+    "Existing editor and presenter layout",
+    "Source front matter, comments and encoding",
+    "Offline system WebView"
+  ],
+  "introduce": [
+    "Searchable template browser",
+    "Actual slide previews",
+    "Portable versioned theme packs"
+  ],
+  "verification": {
+    "static": "Hallmark sloplint: 0 FAIL, 0 REFLEX, 0 WARN",
+    "render": "Hallmark render unavailable without puppeteer-core; actual Playwright slide captures and Chrome/WebKit regressions used",
+    "review": "Independent finish review: ship after four correctness/accessibility fixes",
+    "layout": "28 sample slides fit authored bounds; actions visible at 800x560"
+  }
 }

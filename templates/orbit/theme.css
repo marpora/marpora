@@ -1,0 +1,48 @@
+/* @theme marpora-orbit */
+@import "default";
+
+section { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; font-size:32px; line-height:1.5; padding:66px 78px; justify-content:center; overflow-wrap:break-word; }
+section h1, section h2, section h3 { font-weight:650; letter-spacing:-.025em; line-height:1.12; margin:0 0 28px; }
+section h1 { font-size:72px; } section h2 { font-size:46px; } section h3 { font-size:29px; letter-spacing:-.02em; }
+section p { margin:12px 0; } section ul, section ol { padding-left:1.1em; } section li { margin:12px 0; }
+section header, section footer { font-size:16px; line-height:1.3; letter-spacing:0; }
+section header { top:26px; left:78px; } section footer { bottom:26px; left:78px; }
+section::after { bottom:24px; right:32px; font-size:16px; padding:0; }
+section code { font-size:.8em; border-radius:4px; } section pre { border-radius:8px; padding:24px; line-height:1.45; font-size:24px; }
+section pre code { font-size:1em; } section blockquote { margin:18px 0; padding:4px 24px; border-left:4px solid var(--accent); }
+section table { width:100%; display:table; font-size:25px; border-collapse:collapse; }
+section th, section td { padding:16px 20px; border:0; border-bottom:1px solid var(--rule); background:transparent; }
+section th { font-weight:650; text-align:left; } section table tr { background:transparent; border:0; }
+section a { color:var(--accent); } section img { max-width:100%; max-height:440px; }
+section .columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:54px; align-items:start; }
+section .three { grid-template-columns:repeat(3,minmax(0,1fr)); gap:36px; }
+section .columns > div { min-width:0; } section .columns h3 { margin-top:0; }
+section .caption { font-size:20px; line-height:1.6; color:var(--muted); }
+section .callout { padding:24px 30px; border-left:4px solid var(--accent); background:var(--soft); margin:24px 0; }
+section .flow { display:flex; gap:0; align-items:center; margin:38px 0; }
+section .flow > span { flex:1; padding:24px 8px; border-top:2px solid var(--accent); font-size:26px; }
+section .flow > span + span { padding-left:24px; border-left:1px solid var(--rule); }
+section.title, section.statement, section.section, section.closing { justify-content:center; }
+section.statement h1, section.closing h1 { font-size:86px; max-width:1000px; }
+section.compact { font-size:27px; } section.compact h2 { margin-bottom:22px; }
+
+section { --paper:#101114; --ink:#f3f3ef; --muted:#a5a7ad; --accent:#ef9b58; --soft:#24211f; --rule:#37383d; background:var(--paper); color:var(--ink); }
+section h1, section h2, section h3, section strong { color:var(--ink); }
+section header, section footer, section::after { color:var(--muted); }
+section.title h1 { font-size:96px; max-width:920px; letter-spacing:-.03em; }
+section.title > p { color:var(--muted); max-width:640px; font-size:28px; }
+section.title { background:linear-gradient(115deg,var(--paper) 76%,var(--soft) 76%); }
+section.light { --paper:#f3f3ef; --ink:#18191d; --muted:#555962; --soft:#e5e5df; --rule:#c4c6c3; background:var(--paper); color:var(--ink); }
+section pre, section code { background:var(--soft); color:var(--ink); }
+section .number { display:block; color:var(--accent); font-size:68px; line-height:1.2; font-weight:600; letter-spacing:-.03em; margin-bottom:20px; }
+section .columns.three { margin-top:20px; } section .columns p { font-size:26px; color:var(--muted); }
+section.section { background:var(--accent); --ink:#20180f; --muted:#4b3523; --rule:#b36c36; color:var(--ink); }
+section.section h1 { font-size:100px; }
+section .orbit-art { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+section .orbit-object { position:absolute; width:440px; height:440px; right:70px; top:140px; border:1px solid var(--accent); border-radius:50%; transform:rotate(-28deg); }
+section .orbit-object::before, section .orbit-object::after { content:""; position:absolute; border:1px solid var(--accent); border-radius:50%; inset:100px -42px; }
+section .orbit-object::after { inset:-42px 100px; }
+section.visual h1 { font-size:82px; max-width:630px; position:relative; z-index:1; }
+section.visual .caption { max-width:530px; }
+section.closing { text-align:center; align-items:center; }
+section.closing h1 { font-size:94px; } section.closing p { color:var(--accent); }

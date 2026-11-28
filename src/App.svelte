@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
+  import TemplateLibrary from './components/TemplateLibrary.svelte'
+  import { builtins, importPack, loadLibrary } from './lib/template-library'
+  import { applyTheme, type ThemePack } from './lib/theme-pack'
   import Presenter from './components/Presenter.svelte'
   import PresentationSetup from './components/PresentationSetup.svelte'
   import { PresentationHost } from './lib/presentation-host'
@@ -23,6 +26,9 @@
 
   const initialPreferences = loadPreferences()
   let preferences = $state(initialPreferences)
+  let templatesOpen = $state(false), templateInitial = $state(builtins[0].id), themeRevision = $state(0)
+  let templatePacks = $state<ThemePack[]>([...builtins])
+  let templatesButton = $state<HTMLButtonElement>()
   let preferencesOpen = $state(false)
   let exportOpen = $state(false)
   let systemDark = $state(window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -64,6 +70,7 @@
 
   $effect(() => {
     const id = active.id, source = active.text, kind = active.kind, target = effectiveMode(source, active.mode), css = active.themeCss, language = preferences.language
+    void themeRevision
     const generation = ++renderGeneration
     untrack(() => { if (renderedId !== id) { result = { html: '', css: '', titles: [], notes: [], theme: kind === 'html' ? 'HTML' : 'Markdown' }; renderedId = id } })
     if (kind === 'pdf') { busy = false; return }
@@ -172,9 +179,30 @@
     } catch (cause) { error = t('saveFailed', { error: errorMessage(cause, preferences.language) }); return false }
     finally { fileBusy = false }
   }
+  function showTemplates() { templateInitial = builtins[0].id; templatesOpen = true; preferencesOpen = false; exportOpen = false }
+  function closeTemplates() { templatesOpen = false; requestAnimationFrame(() => templatesButton?.focus({ preventScroll: true })) }
+  async function importTemplate(): Promise<ThemePack | null> {
+    const source = await loadTheme(preferences.language)
+    if (!source) return null
+    const pack = await importPack(source)
+    templatePacks = [...await loadLibrary()]; themeRevision++
+    return pack
+  }
+  function createTemplate(pack: ThemePack) {
+    const tab = newTab(pack.starter.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'), `${pack.name.en}.md`)
+    tab.lineEnding = pack.starter.includes('\r\n') ? 'crlf' : 'lf'; tab.bom = pack.starter.startsWith('\uFEFF')
+    tab.savedText = null; tabs.push(tab); activate(tab.id); templatesOpen = false
+    requestAnimationFrame(() => editor?.focus())
+  }
+  function applyTemplate(pack: ThemePack) {
+    try {
+      const next = applyTheme(active.text, pack.theme)
+      if (!editor?.replaceSource(next)) return
+      active.mode = 'slides'; active.themeCss = ''; templatesOpen = false; error = ''
+    } catch (cause) { error = errorMessage(cause, preferences.language); templatesOpen = false }
+  }
   async function theme() {
-    const tab = active
-    try { const css = await loadTheme(preferences.language); if (css && !/@theme\s+([\w-]+)/.test(css)) { error = t('themeMetadata'); return }; if (css) tab.themeCss = css }
+    try { const pack = await importTemplate(); if (pack) { templateInitial = pack.id; templatesOpen = true } }
     catch (cause) { error = t('themeFailed', { error: errorMessage(cause, preferences.language) }) }
   }
   async function exportFile(format: 'html' | 'pdf') {
@@ -233,6 +261,7 @@
   }
   function keyboard(event: KeyboardEvent, fromPreview = false) {
     if (event.isComposing) return
+    if (templatesOpen) { if (event.key === 'Escape') { event.preventDefault(); closeTemplates() }; return }
     if (presenterSession) { const action = keyAction(event); if (action) { event.preventDefault(); presenterHost?.action(action) }; return }
     if (presenterSetup) { if (event.key === 'Escape') { event.preventDefault(); cancelPresentation() }; return }
     if (event.key === 'Escape') { preferencesOpen = false; exportOpen = false }
@@ -262,6 +291,7 @@
       if (!drafts.length) { const old = JSON.parse(localStorage.getItem('marpora.draft.v1') || 'null'); if (old?.dirty && typeof old.text === 'string') drafts = restoreDrafts({ tabs: [old] }) }
       if (drafts.length) { tabs = drafts; activeId = drafts.find(tab => tab.id === stored?.activeId)?.id || drafts[0].id; recovered = true }
     } catch { /* Ignore damaged optional drafts. */ }
+    void loadLibrary().then(packs => { templatePacks = [...packs]; themeRevision++ })
     initialized = true
     if (!desktop) return () => { void presenterHost?.stop(); media.removeEventListener('change', updateSystemTheme) }
     const cleanups: Array<() => void> = []; let disposed = false
@@ -274,7 +304,7 @@
         if (await confirmDiscard(true)) { closing = true; tabs.forEach(tab => tab.savedText = tab.text); try { localStorage.removeItem(draftKey) } catch { /* Optional storage. */ }; await getCurrentWindow().destroy() }
       })
       const menu = await listen<string>('menu-action', ({ payload }) => {
-        if ((presenterSession || presenterSetup) && payload !== 'quit') return
+        if ((presenterSession || presenterSetup || templatesOpen) && payload !== 'quit') return
         if (payload === 'open') void open()
         if (payload === 'open-folder') void chooseFolder()
         if (payload === 'save') void save()
@@ -285,8 +315,8 @@
         if (payload === 'export-pdf') void exportFile('pdf')
         if (payload === 'quit') void getCurrentWindow().close()
       })
-      const drop = await listen<OpenDocument>('document-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup) add(payload) })
-      const folderDrop = await listen<Folder>('folder-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup) { folder = payload; sidebar = true; folderRevision++ } })
+      const drop = await listen<OpenDocument>('document-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup && !templatesOpen) add(payload) })
+      const folderDrop = await listen<Folder>('folder-dropped', ({ payload }) => { if (!presenterSession && !presenterSetup && !templatesOpen) { folder = payload; sidebar = true; folderRevision++ } })
       const failure = await listen<string>('document-error', ({ payload }) => { error = errorMessage(payload, preferences.language) })
       if (disposed) [close, menu, drop, folderDrop, failure].forEach(fn => fn()); else cleanups.push(close, menu, drop, folderDrop, failure)
     })()
@@ -296,7 +326,7 @@
 
 <svelte:window onpointerdown={(event) => { if (!(event.target as Element).closest('.preferences-anchor')) preferencesOpen = false; if (!(event.target as Element).closest('.export-anchor')) exportOpen = false }} onkeydown={keyboard} onbeforeunload={beforeUnload} onpagehide={() => { void presenterHost?.stop() }} onpointermove={resize} onpointerup={() => dragging = false} />
 
-<div class="app-shell" class:presenter-active={!!presenterSession} class:resizing={dragging} inert={presenterSetup || !!presenterSession}>
+<div class="app-shell" class:presenter-active={!!presenterSession} class:resizing={dragging} inert={presenterSetup || !!presenterSession || templatesOpen}>
   <header class="toolbar">
     <div class="brand" aria-label="Marpora">
       <Logo/>
@@ -314,6 +344,7 @@
     </div>
     <div class="document-name" title={path || label}><span>{label}</span>{#if dirty}<span class="unsaved" aria-label={t('unsaved')}>{t('unsaved')}</span>{/if}</div>
     <div class="toolbar-end">
+      <button type="button" class="quiet-button" bind:this={templatesButton} onclick={showTemplates} disabled={fileBusy || exporting}>{t('templates')}</button>
       <div class="preferences-anchor">
         <button class="icon-button" aria-label={t('preferences')} title={t('preferences')} aria-expanded={preferencesOpen} onclick={() => preferencesOpen = !preferencesOpen}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg></button>
         {#if preferencesOpen}<PreferencesPanel value={preferences} onchange={(value) => preferences = value} onclose={() => preferencesOpen = false}/>{/if}
@@ -407,3 +438,5 @@
 
 {#if presenterSetup}<PresentationSetup language={preferences.language} starting={presenterStarting} onstart={startPresentation} onclose={cancelPresentation}/>{/if}
 {#if presenterSession}<Presenter session={presenterSession} onshowaudience={() => presenterHost?.showAudience()} onaction={action => presenterHost?.action(action)}/>{/if}
+
+{#if templatesOpen}<TemplateLibrary language={preferences.language} packs={templatePacks} initialId={templateInitial} canApply={active.kind === 'markdown' && !!editor} oncreate={createTemplate} onapply={applyTemplate} onimport={importTemplate} onclose={closeTemplates}/>{/if}

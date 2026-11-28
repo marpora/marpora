@@ -10,3 +10,4 @@ playwright-report/
 public/pdfjs/
 tmp/
 output/
+dist-catalog/

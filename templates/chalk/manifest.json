@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "marpora/chalk",
+  "version": "1.0.0",
+  "name": {
+    "en": "Chalk",
+    "zh": "Chalk"
+  },
+  "category": "teaching",
+  "description": {
+    "en": "A clear rhythm for teaching and understanding.",
+    "zh": "用清晰的目标、例题和提问组织一堂好课。"
+  },
+  "author": "Marpora",
+  "license": "MIT",
+  "theme": "marpora-chalk",
+  "accent": "#f0c971",
+  "background": "#153f37",
+  "layouts": [
+    "title",
+    "statement",
+    "columns",
+    "section",
+    "closing"
+  ],
+  "minAppVersion": "0.4.0"
+}

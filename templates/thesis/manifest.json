@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "marpora/thesis",
+  "version": "1.0.0",
+  "name": {
+    "en": "Thesis",
+    "zh": "Thesis"
+  },
+  "category": "academic",
+  "description": {
+    "en": "Give your question and evidence equal weight.",
+    "zh": "让研究问题、方法、证据和不确定性各得其所。"
+  },
+  "author": "Marpora",
+  "license": "MIT",
+  "theme": "marpora-thesis",
+  "accent": "#315f82",
+  "background": "#f5f4ef",
+  "layouts": [
+    "title",
+    "statement",
+    "columns",
+    "section",
+    "closing"
+  ],
+  "minAppVersion": "0.4.0"
+}

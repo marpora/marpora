@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { EditorState, StateEffect, Compartment, type Extension } from '@codemirror/state'
+  import { EditorState, StateEffect, Transaction, Compartment, type Extension } from '@codemirror/state'
   import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection, placeholder } from '@codemirror/view'
-  import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+  import { defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory } from '@codemirror/commands'
   import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
   import { HighlightStyle, syntaxHighlighting, indentOnInput, bracketMatching } from '@codemirror/language'
   import { tags } from '@lezer/highlight'
@@ -40,6 +40,16 @@
     return [placeholder(t('placeholder')), EditorState.phrases.of(language === 'zh' ? searchPhrases : {}), EditorView.contentAttributes.of({ 'aria-label': t('editor'), spellcheck: 'false', autocapitalize: 'off' })]
   }
 
+  export function replaceSource(next: string): boolean {
+    if (!view) return false
+    const previous = view.state.doc.toString()
+    if (previous === next) return true
+    let from = 0, oldEnd = previous.length, newEnd = next.length
+    while (from < oldEnd && from < newEnd && previous[from] === next[from]) from++
+    while (oldEnd > from && newEnd > from && previous[oldEnd - 1] === next[newEnd - 1]) { oldEnd--; newEnd-- }
+    view.dispatch({ changes: { from, to: oldEnd, insert: next.slice(from, newEnd) }, annotations: [Transaction.userEvent.of('input.theme'), isolateHistory.of('full')] })
+    return true
+  }
   export function focus() { view?.focus() }
   export function jumpTo(offset: number) {
     if (!view) return

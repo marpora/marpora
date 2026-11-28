@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "marpora/orbit",
+  "version": "1.0.0",
+  "name": {
+    "en": "Orbit",
+    "zh": "Orbit"
+  },
+  "category": "showcase",
+  "description": {
+    "en": "A cinematic stage for a big idea.",
+    "zh": "用大胆留白、巨幅文字和明暗切换呈现重要想法。"
+  },
+  "author": "Marpora",
+  "license": "MIT",
+  "theme": "marpora-orbit",
+  "accent": "#ef9b58",
+  "background": "#101114",
+  "layouts": [
+    "title",
+    "statement",
+    "columns",
+    "section",
+    "closing"
+  ],
+  "minAppVersion": "0.4.0"
+}

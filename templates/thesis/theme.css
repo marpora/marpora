@@ -1,0 +1,43 @@
+/* @theme marpora-thesis */
+@import "default";
+
+section { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; font-size:32px; line-height:1.5; padding:66px 78px; justify-content:center; overflow-wrap:break-word; }
+section h1, section h2, section h3 { font-weight:650; letter-spacing:-.025em; line-height:1.12; margin:0 0 28px; }
+section h1 { font-size:72px; } section h2 { font-size:46px; } section h3 { font-size:29px; letter-spacing:-.02em; }
+section p { margin:12px 0; } section ul, section ol { padding-left:1.1em; } section li { margin:12px 0; }
+section header, section footer { font-size:16px; line-height:1.3; letter-spacing:0; }
+section header { top:26px; left:78px; } section footer { bottom:26px; left:78px; }
+section::after { bottom:24px; right:32px; font-size:16px; padding:0; }
+section code { font-size:.8em; border-radius:4px; } section pre { border-radius:8px; padding:24px; line-height:1.45; font-size:24px; }
+section pre code { font-size:1em; } section blockquote { margin:18px 0; padding:4px 24px; border-left:4px solid var(--accent); }
+section table { width:100%; display:table; font-size:25px; border-collapse:collapse; }
+section th, section td { padding:16px 20px; border:0; border-bottom:1px solid var(--rule); background:transparent; }
+section th { font-weight:650; text-align:left; } section table tr { background:transparent; border:0; }
+section a { color:var(--accent); } section img { max-width:100%; max-height:440px; }
+section .columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:54px; align-items:start; }
+section .three { grid-template-columns:repeat(3,minmax(0,1fr)); gap:36px; }
+section .columns > div { min-width:0; } section .columns h3 { margin-top:0; }
+section .caption { font-size:20px; line-height:1.6; color:var(--muted); }
+section .callout { padding:24px 30px; border-left:4px solid var(--accent); background:var(--soft); margin:24px 0; }
+section .flow { display:flex; gap:0; align-items:center; margin:38px 0; }
+section .flow > span { flex:1; padding:24px 8px; border-top:2px solid var(--accent); font-size:26px; }
+section .flow > span + span { padding-left:24px; border-left:1px solid var(--rule); }
+section.title, section.statement, section.section, section.closing { justify-content:center; }
+section.statement h1, section.closing h1 { font-size:86px; max-width:1000px; }
+section.compact { font-size:27px; } section.compact h2 { margin-bottom:22px; }
+
+section { --paper:#f5f4ef; --ink:#263a49; --muted:#596a73; --accent:#315f82; --soft:#e8edf0; --rule:#c6d1d8; --serif:Georgia,"Times New Roman","Songti SC","SimSun",serif; background:var(--paper); color:var(--ink); font-size:30px; }
+section h1, section h2 { font-family:var(--serif); font-weight:400; letter-spacing:-.02em; color:var(--ink); }
+section h3, section strong { color:var(--ink); } section h2 { font-size:49px; border-bottom:1px solid var(--rule); padding-bottom:22px; }
+section header, section footer, section::after { color:var(--muted); }
+section.title { border-top:12px solid var(--accent); } section.title h1 { font-size:82px; max-width:1060px; }
+section.title p { color:var(--muted); font-size:25px; }
+section pre, section code { background:var(--soft); color:var(--ink); }
+section .definition { border-left:4px solid var(--accent); padding:16px 28px; margin:26px 0; background:var(--soft); }
+section .definition h3 { font-family:var(--serif); font-size:33px; font-weight:400; }
+section .columns p { font-size:25px; }
+section.equation { text-align:center; } section.equation h2 { text-align:left; }
+section.equation .katex-display { font-size:1.35em; margin:28px 0; }
+section.section, section.closing { --paper:#263e50; --ink:#f4f2e9; --muted:#bdcbd4; --accent:#b7d6e9; --soft:#354f62; --rule:#627b8b; background:var(--paper); color:var(--ink); }
+section.section h1, section.closing h1 { font-size:85px; }
+section .reference { margin-top:30px; font-size:19px; color:var(--muted); }

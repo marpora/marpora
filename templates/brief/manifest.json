@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "marpora/brief",
+  "version": "1.0.0",
+  "name": {
+    "en": "Brief",
+    "zh": "Brief"
+  },
+  "category": "business",
+  "description": {
+    "en": "Make the decision easy to see.",
+    "zh": "用简洁的比较、行动计划和风险说明推动决策。"
+  },
+  "author": "Marpora",
+  "license": "MIT",
+  "theme": "marpora-brief",
+  "accent": "#b94c35",
+  "background": "#f6f3ee",
+  "layouts": [
+    "title",
+    "statement",
+    "columns",
+    "section",
+    "closing"
+  ],
+  "minAppVersion": "0.4.0"
+}

@@ -220,7 +220,7 @@ async fn open_theme(app: tauri::AppHandle) -> Result<Option<String>, String> {
         let Some(selected) = app
             .dialog()
             .file()
-            .add_filter("Marp theme", &["css"])
+            .add_filter("Marp theme or Marpora pack", &["css", "json"])
             .blocking_pick_file()
         else {
             return Ok(None);
@@ -229,6 +229,38 @@ async fn open_theme(app: tauri::AppHandle) -> Result<Option<String>, String> {
         let text =
             String::from_utf8(read_limited(&path, 2 * 1024 * 1024)?).map_err(|e| e.to_string())?;
         Ok(Some(text))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn save_theme_pack(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    suggested_name: String,
+    content: String,
+) -> Result<bool, String> {
+    if window.label() != "main"
+        || content.len() > 2 * 1024 * 1024
+        || suggested_name.len() > 120
+        || suggested_name.contains(['/', '\\'])
+    {
+        return Err("MAR_PORA:invalidThemePack".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(selected) = app
+            .dialog()
+            .file()
+            .set_file_name(&suggested_name)
+            .add_filter("Marpora theme pack", &["json"])
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let path = selected.into_path().map_err(|e| e.to_string())?;
+        write_document(&path, &content, None, "lf", false)?;
+        Ok(true)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -417,6 +449,7 @@ pub fn run() {
             open_document,
             save_document,
             open_theme,
+            save_theme_pack,
             read_image,
             set_language,
             workspace::open_folder,
