@@ -2,7 +2,7 @@
 
 **本地写作，自由呈现。** 一个轻量的 Markdown 与 Marp 桌面编辑器，macOS 优先，使用 Tauri 2、Svelte 5、TypeScript、CodeMirror 6 和 Marp Core。
 
-[English](README.md) · [品牌文件](brand/README.md) · [实现说明](docs/architecture.md)
+[下载 macOS 安装包](https://github.com/marpora/marpora/releases/latest) · [English](README.md) · [品牌文件](brand/README.md) · [实现说明](docs/architecture.md)
 
 ![文件夹与多标签](docs/screenshots/marpora-workspace.png)
 

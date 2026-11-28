@@ -2,7 +2,7 @@
 <h1 align="center">Marpora</h1>
 <p align="center">Write locally. Present freely.</p>
 <p align="center">A lightweight Markdown editor with live editing and Marp slides.<br>macOS first. Built with Tauri, Svelte, TypeScript and CodeMirror.</p>
-<p align="center"><a href="README.zh-CN.md">简体中文</a> · <a href="#development">Development</a> · <a href="docs/architecture.md">Architecture</a> · <a href="brand/README.md">Brand assets</a></p>
+<p align="center"><a href="https://github.com/marpora/marpora/releases/latest">Download for macOS</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="#development">Development</a> · <a href="docs/architecture.md">Architecture</a> · <a href="brand/README.md">Brand assets</a></p>
 
 ![Folder workspace and document tabs](docs/screenshots/marpora-workspace.png)
 
