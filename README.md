@@ -12,7 +12,8 @@ Marpora is an early desktop prototype for writing Markdown and making presentati
 
 - **Live editing:** formatted headings, emphasis, links, lists and quotes. Click rendered code, tables or images to edit the original Markdown. Switch to source mode without losing selection or undo history.
 - **Files and tabs:** open a folder, browse its nested Markdown / HTML / PDF files, and keep multiple documents open. Each Markdown tab retains its own text, undo history, selection and scroll position.
-- **Marp previews:** automatic `marp: true` detection, slide navigation, speaker notes, presentation mode, fragments, custom CSS themes and local KaTeX fonts.
+- **Dual-screen Presenter:** choose a projection display for fullscreen slides; the original window shows the current/next slide, private notes, a pauseable elapsed timer and resizable thumbnail navigation. Slides and fragments synchronize from either window.
+- **Marp previews:** automatic `marp: true` detection, slide navigation, speaker notes, fragments, custom CSS themes and local KaTeX fonts.
 - **HTML and PDF:** open exported Marp HTML as a script-free, read-only slide preview; read PDFs with page navigation and zoom. Export standalone HTML or PDF without changing the Markdown buffer.
 - **English and Chinese:** English by default. Light, dark or system appearance; system, blue, teal, rose or amber accents.
 - **Local documents:** UTF-8 BOM and LF/CRLF preservation, atomic disk saves, external-change checks, close warnings and recovery of multiple unsaved drafts.
@@ -25,11 +26,22 @@ Open a Markdown file with **Open**, or choose **Open folder** to browse a worksp
 
 The [UIC fixture](examples/uic/example.md) exercises ten slides, custom layouts, comments, fragments, code, tables and notes. Open it through the same file picker as any other document. It is a compatibility fixture, not a dedicated product action. The MIT-licensed theme and known extension are attributed in [examples/uic](examples/uic); Marpora does not execute arbitrary external Marp JavaScript engines.
 
+### Present on two screens
+
+Open a Marp Markdown deck or exported Marp HTML, then choose **Present → Audience display → Start presentation**. Connect a projector for a fullscreen audience window; the original window becomes the presenter console. **Show audience** brings the projection window to the front. **Windowed rehearsal** works on one display. Browser development supports a separate rehearsal pop-up; display selection is available in the desktop app.
+
+Use arrow keys, Page Up/Down or Space in either window to navigate slides and reveal fragments. Home/End jumps to the first/last slide; Esc ends the presentation. Click a thumbnail to jump to that slide with its fragments reset. The timer starts when the audience deck is ready, and supports Pause/Resume and Reset. Drag the column, notes or thumbnail dividers to resize; double-click to reset. Notes stay in the presenter window, including notes recovered from standard Marp HTML exports.
+
+Presenting freezes the current rendered buffer, including unsaved edits, without saving or rewriting the source. Closing the audience window returns to editing. A disconnected or changed projection display ends the session so it can be restarted on an available display.
+
+![Dual-screen presenter console](docs/screenshots/presenter.png)
+
 ### Preview and export details
 
 | Feature | Implementation |
 | --- | --- |
 | Markdown / Marp preview | Sanitized HTML in an iframe with authored scripts disabled |
+| Dual-screen Presenter | Two system WebViews; a revisioned presentation session; no browser runtime or local server |
 | Existing HTML | Read-only; Marp SVG slides are recognized, other HTML is shown as a document |
 | PDF preview | PDF.js, loaded only when a PDF is opened; CMaps, fonts and decoding assets are local |
 | Standalone HTML export | Embedded images, CSS resources and math fonts; app-owned keyboard navigation; printable slides |

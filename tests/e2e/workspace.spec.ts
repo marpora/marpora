@@ -33,7 +33,7 @@ test('Markdown edits preview live and keep undo history', async ({ page }) => {
   expect(failures).toEqual([])
 })
 
-test('UIC template renders and supports slide navigation and presentation fragments', async ({ page }) => {
+test('UIC template renders and supports slide navigation', async ({ page }) => {
   const failures: string[] = []
   page.on('pageerror', error => failures.push(error.message))
   await sourceWorkspace(page)
@@ -45,13 +45,6 @@ test('UIC template renders and supports slide navigation and presentation fragme
   await expect(page.getByTestId('slide-counter')).toHaveText('2/10')
   await expect(preview.locator('svg.current h2')).toHaveText("Today's plan")
   await page.getByRole('button', { name: '06 Code, then', exact: false }).click()
-  await page.getByRole('button', { name: 'Present', exact: true }).click()
-  await expect(preview.locator('svg.current .unrevealed')).toHaveCount(2)
-  await page.getByTestId('preview-surface').click()
-  await page.keyboard.press('Space')
-  await expect(preview.locator('svg.current .unrevealed')).toHaveCount(1)
-  await page.keyboard.press('Escape')
-  await expect(preview.locator('.unrevealed:visible')).toHaveCount(0)
   await page.getByRole('button', { name: '01 CS 000', exact: false }).click()
   await page.screenshot({ path: 'docs/screenshots/uic-slides.png' })
   expect(failures).toEqual([])

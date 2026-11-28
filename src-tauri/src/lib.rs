@@ -13,6 +13,7 @@ use tauri::{
 };
 use tauri_plugin_dialog::DialogExt;
 mod export;
+mod presenter;
 mod workspace;
 
 const MAX_DOCUMENT: u64 = 16 * 1024 * 1024;
@@ -409,6 +410,7 @@ fn set_language(app: tauri::AppHandle, language: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Documents::default())
+        .manage(presenter::Presentation::default())
         .manage(workspace::Folders::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -422,13 +424,28 @@ pub fn run() {
             workspace::open_workspace_file,
             workspace::read_document,
             workspace::read_resource,
-            export::export_document
+            export::export_document,
+            presenter::presentation_displays,
+            presenter::presentation_open,
+            presenter::presentation_snapshot,
+            presenter::presentation_focus,
+            presenter::presentation_update,
+            presenter::presentation_action,
+            presenter::presentation_ready,
+            presenter::presentation_close,
+            presenter::presentation_health
         ])
         .menu(|app| build_menu(app, "en"))
         .on_menu_event(|app, event| {
             let _ = app.emit("menu-action", event.id().as_ref());
         })
         .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                presenter::window_destroyed(window);
+            }
+            if window.label() != "main" {
+                return;
+            }
             if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
                 let paths = paths.clone();
                 let app = window.app_handle().clone();

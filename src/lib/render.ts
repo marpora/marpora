@@ -115,9 +115,14 @@ export function importHtml(source: string, language: Language = 'en'): { result:
   const slides = Array.from(doc.querySelectorAll('svg[data-marpit-svg]'))
   const css = Array.from(doc.querySelectorAll('style')).map(el => el.textContent || '').join('\n')
   const dimensions = slides[0]?.getAttribute('viewBox')?.split(/\s+/).map(Number)
+  const notes: string[][] = slides.map(() => [])
+  doc.querySelectorAll('.bespoke-marp-note[data-index]').forEach(note => {
+    const index = Number(note.getAttribute('data-index'))
+    if (Number.isInteger(index) && notes[index]) notes[index].push(note.textContent?.trim() || '')
+  })
   const html = slides.length ? `<div>${slides.map(el => el.outerHTML).join('')}</div>` : doc.body.innerHTML
   return {
     mode: slides.length ? 'slides' : 'document',
-    result: { html: sanitizeHtml(html), css: `${css}\n.slides #preview>div>svg{position:relative!important;inset:auto!important;visibility:visible!important;opacity:1!important;transform:translateZ(0)!important}.slides [data-marpit-fragment]{opacity:1!important}`, titles: slides.length ? slideTitles(html, language) : [], notes: [], theme: 'HTML', aspectRatio: dimensions && dimensions[3] > 0 ? dimensions[2] / dimensions[3] : 16 / 9 },
+    result: { html: sanitizeHtml(html), css: `${css}\n.slides #preview>div>svg{position:relative!important;inset:auto!important;visibility:visible!important;opacity:1!important;transform:translateZ(0)!important}.slides [data-marpit-fragment]{opacity:1!important}`, titles: slides.length ? slideTitles(html, language) : [], notes, theme: 'HTML', aspectRatio: dimensions && dimensions[3] > 0 ? dimensions[2] / dimensions[3] : 16 / 9 },
   }
 }

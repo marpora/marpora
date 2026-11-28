@@ -1,6 +1,46 @@
 export type Language = 'en' | 'zh'
 
 const messages = {
+  showAudience: ['Show audience', '显示观众窗口'],
+  presenterView: ["Presenter view", "演讲者视图"],
+  audience: ["Audience", "观众"],
+  audienceSlide: ["Audience slide", "观众幻灯片"],
+  presentationEnded: ["Presentation ended", "演示已结束"],
+  preparingPresentation: ["Preparing presentation…", "正在准备演示…"],
+  popupBlocked: ["Allow pop-up windows to start a rehearsal.", "请允许弹出窗口以开始排练。"],
+  audienceTimeout: ["The audience window did not finish loading. Try starting again.", "观众窗口加载超时，请重新开始演示。"],
+  presenterPermission: ["This window cannot perform that presentation action.", "此窗口无法执行这项演示操作。"],
+  invalidPresentation: ["This presentation exceeds supported dimensions or size.", "演示内容超出支持的尺寸或大小。"],
+  displayDisconnected: ["The projection display changed or disconnected. Reconnect it and start again.", "投影屏幕已改变或断开连接，请重新连接并开始演示。"],
+  presentationActive: ["A presentation is already running.", "已有演示正在进行。"],
+  presentationExpired: ["This presentation has ended.", "此演示已结束。"],
+  presenterSetupHint: ["Keep your notes here. Choose where the audience will see your slides.", "备注将保留在此窗口。请选择观众观看幻灯片的屏幕。"],
+  audienceDisplay: ["Audience display", "观众屏幕"],
+  windowedRehearsal: ["Windowed rehearsal", "窗口排练"],
+  currentDisplay: ["Current display", "当前屏幕"],
+  browserRehearsalHint: ["Browser preview supports a separate rehearsal window. Use the desktop app to choose a projection display.", "浏览器预览支持独立排练窗口。请使用桌面应用选择投影屏幕。"],
+  singleDisplayHint: ["One display detected. Connect a projector for dual-screen presenting, or rehearse in a window.", "检测到一个屏幕。连接投影仪可使用双屏演示，也可以先在窗口中排练。"],
+  fullscreenAudienceHint: ["The audience window will open fullscreen on this display. The controller stays in this window.", "观众窗口将在此屏幕全屏显示，控制台保留在当前窗口。"],
+  cancel: ["Cancel", "取消"],
+  startPresentation: ["Start presentation", "开始演示"],
+  elapsedTime: ["Elapsed time", "已用时间"],
+  resumeTimer: ["Resume", "继续计时"],
+  pauseTimer: ["Pause", "暂停计时"],
+  resetTimer: ["Reset", "重置计时"],
+  endPresentation: ["End presentation", "结束演示"],
+  waitingForAudience: ["Waiting for the audience window…", "正在等待观众窗口…"],
+  currentSlide: ["Current slide", "当前页"],
+  nextSlidePreview: ["Next slide preview", "下一页预览"],
+  lastSlide: ["End of presentation", "已到最后一页"],
+  resizePresenterColumns: ["Resize presenter columns", "调整演讲者分栏"],
+  resizePresenterHint: ["Drag to resize; double-click to reset; arrow keys to adjust", "拖动调整；双击复位；方向键微调"],
+  resizeNextSlide: ["Resize next slide and notes", "调整下一页与备注区域"],
+  fragmentStep: ["Step {current} / {total}", "分步 {current} / {total}"],
+  presenterKeys: ["← → / ↑ ↓ / Space · Home / End", "← → / ↑ ↓ / 空格 · Home / End"],
+  resizeThumbnails: ["Resize thumbnails", "调整缩略图大小"],
+  slideThumbnails: ["Slide thumbnails", "幻灯片缩略图"],
+  presenterFailed: ["Could not start or synchronize presentation: {error}", "无法开始或同步演示：{error}"],
+
   exportExtension: ['Choose a filename ending in the export format (.html or .pdf).', '请选择以导出格式（.html 或 .pdf）结尾的文件名。'],
   openFolder: ['Open folder', '打开文件夹'], folder: ['Folder', '文件夹'], toggleSidebar: ['Toggle sidebar', '切换侧栏'], refreshFolder: ['Refresh folder', '刷新文件夹'], loading: ['Loading…', '加载中…'], emptyFolder: ['No supported files', '没有支持的文件'], openTabs: ['Open documents', '打开的文档'], closeTab: ['Close {name}', '关闭 {name}'],
   export: ['Export', '导出'], exportHtml: ['Export HTML', '导出 HTML'], exportPdf: ['Export PDF', '导出 PDF'], exporting: ['Exporting…', '导出中…'], exportFailed: ['Could not export: {error}', '导出失败：{error}'], exported: ['Export ready: {name}', '导出完成：{name}'], openExport: ['Preview export', '预览导出文件'], readOnly: ['Read-only preview', '只读预览'], page: ['Page', '页码'], previousPage: ['Previous page', '上一页'], nextPage: ['Next page', '下一页'], zoom: ['Zoom', '缩放'], pdfTooLarge: ['PDF exceeds 64 MB.', 'PDF 超过 64 MB。'], pdfFailed: ['Could not display PDF: {error}', '无法显示 PDF：{error}'], printPdf: ['Use your browser’s print dialog to save as PDF.', '请在浏览器打印对话框中保存为 PDF。'],
@@ -42,7 +82,7 @@ export function translator(language: Language): Translate {
 }
 
 export function errorMessage(error: unknown, language: Language): string {
-  const value = String(error)
+  const value = error instanceof Error ? error.message : String(error)
   return value.startsWith('MAR_PORA:') && value.slice(9) in messages ? translator(language)(value.slice(9) as MessageKey) : value
 }
 
