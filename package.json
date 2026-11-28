@@ -15,7 +15,8 @@
     "tauri": "tauri",
     "desktop": "tauri dev",
     "desktop:build": "tauri build",
-    "test:interaction": "playwright test --config playwright.interaction.config.ts"
+    "test:interaction": "playwright test --config playwright.interaction.config.ts",
+    "test:release": "node --test tests/release.test.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.1",

@@ -45,9 +45,15 @@ jobs:
         with:
           workspaces: src-tauri
           key: ${{ matrix.target }}
+      - name: Validate version tag
+        if: github.ref_type == 'tag'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/release.mjs check "$RELEASE_TAG"
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - run: npm run test:release
       - name: Check native file and export logic
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - name: Build app and DMG
@@ -64,3 +70,28 @@ jobs:
           path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Marpora-macOS-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish verified installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/release.mjs publish "$RELEASE_TAG" release-assets

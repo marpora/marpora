@@ -53,7 +53,7 @@ macOS 浏览器测试使用已安装的 Chrome，其他环境可为开发测试�
 
 ## 当前边界
 
-目前在 Apple Silicon macOS 本机验证；[打包工作流](.github/workflows/packages.yml) 在 main 更新、版本标签或手动运行时生成 Apple Silicon 与 Intel Mac DMG；Actions 产物保留 30 天。Windows/Linux 发行包后续启用，跨平台源码继续保留；Intel 运行效果仍需实机验证。macOS 本地包为临时签名，尚未 Developer ID 签名、公证；工作流上传构建产物，不自动发布 Release。
+目前在 Apple Silicon macOS 本机验证；[打包工作流](.github/workflows/packages.yml) 在 main 更新、版本标签或手动运行时生成 Apple Silicon 与 Intel Mac DMG；Actions 产物保留 30 天。Windows/Linux 发行包后续启用，跨平台源码继续保留；Intel 运行效果仍需实机验证。macOS 本地包为临时签名，尚未 Developer ID 签名、公证；main 构建保留 Actions 产物；推送版本 tag 后，两种架构都验证通过才会自动发布 GitHub Release，并附上 SHA-256 校验文件。详见[发布说明](docs/releasing.md)。
 
 尚无表格单元格富文本操作、文件关联、文件监听、模板商城或任意外部 Marp 插件。大文档性能未做基准测试，Marp 渲染仍在前端主线程。没有遥测、云同步；文档中的远程资源仍可能发起网络请求。草稿是本机恢复辅助，不代替正式保存。
 
