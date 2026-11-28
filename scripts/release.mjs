@@ -50,28 +50,35 @@ export function publishRelease({ tag, repository, directory, root = projectRoot,
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository || '')) throw new Error('Set GH_REPO to owner/repository')
   const metadata = releaseMetadata(tag, root)
   const files = prepareAssets(metadata, directory)
-  const endpoint = `repos/${repository}/releases/tags/${encodeURIComponent(tag)}`
-  const existing = run(['api', endpoint])
-  let release
-  if (existing.status === 0) release = JSON.parse(existing.stdout)
-  else if (!/HTTP 404/.test(existing.stderr)) throw new Error(existing.stderr || 'Could not check existing release')
-  if (release && !release.draft) {
-    // Published binaries are immutable here: a rerun must never silently replace them.
-    verifyAssets(release, files)
-    return release.html_url
+  const viewArgs = ['release', 'view', tag, '--repo', repository, '--json', 'databaseId,isDraft,url']
+  const existing = run(viewArgs)
+  let summary
+  if (existing.status === 0) summary = JSON.parse(existing.stdout)
+  else if (!/release not found|HTTP 404/i.test(existing.stderr)) throw new Error(existing.stderr || 'Could not check existing release')
+  const readRelease = id => {
+    if (!Number.isSafeInteger(id) || id < 1) throw new Error('Invalid GitHub release ID')
+    // GitHub's /releases/tags endpoint excludes drafts. Resolve their ID with
+    // gh release view, then read assets through the authenticated ID endpoint.
+    return JSON.parse(checked(run, ['api', `repos/${repository}/releases/${id}`]))
   }
-  if (!release) {
+  if (summary && !summary.isDraft) {
+    // Published binaries are immutable here: a rerun must never silently replace them.
+    verifyAssets(readRelease(summary.databaseId), files)
+    return summary.url
+  }
+  if (!summary) {
     const specific = resolve(root, `docs/releases/${tag}.md`)
     const notes = existsSync(specific) ? specific : resolve(root, 'docs/releases/default.md')
     const args = ['release', 'create', tag, '--repo', repository, '--verify-tag', '--draft', '--title', `Marpora ${tag}`, '--notes-file', notes]
     if (!existsSync(specific)) args.push('--generate-notes')
     if (metadata.prerelease) args.push('--prerelease')
     checked(run, args)
+    summary = JSON.parse(checked(run, viewArgs))
   }
   checked(run, ['release', 'upload', tag, '--repo', repository, ...files.map(file => file.path), '--clobber'])
   // All assets must have the expected names, sizes and GitHub SHA-256 digests
   // before the draft becomes publicly downloadable.
-  verifyAssets(JSON.parse(checked(run, ['api', endpoint])), files)
+  verifyAssets(readRelease(summary.databaseId), files)
   checked(run, ['release', 'edit', tag, '--repo', repository, '--draft=false', `--prerelease=${metadata.prerelease}`, metadata.prerelease ? '--latest=false' : '--latest=true'])
   return `https://github.com/${repository}/releases/tag/${tag}`
 }

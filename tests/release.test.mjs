@@ -40,30 +40,38 @@ test('a renamed non-DMG file cannot be published', t => {
   writeFileSync(join(f.directory, f.metadata.names[0]), 'not a disk image')
   assert.throws(() => prepareAssets(f.metadata, f.directory), /Not a UDIF/)
 })
-test('create draft, upload both installers, verify digests, then publish', t => {
+test('create draft, resolve draft ID, upload installers, verify digests, then publish', t => {
   const f = fixture(t), files = prepareAssets(f.metadata, f.directory), calls = []
-  let reads = 0
+  let exists = false
   const run = args => {
     calls.push(args)
-    if (args[0] === 'api') return ++reads === 1 ? { status: 1, stdout: '', stderr: 'HTTP 404' } : ok({ assets: remote(files), draft: true })
+    if (args[1] === 'view') return exists ? ok({ databaseId: 42, isDraft: true }) : { status: 1, stdout: '', stderr: 'release not found' }
+    if (args[1] === 'create') exists = true
+    if (args[0] === 'api') return ok({ assets: remote(files), draft: true })
     return ok()
   }
   const url = publishRelease({ tag: 'v0.3.1', repository: 'marpora/marpora', ...f, run })
   assert.equal(url, 'https://github.com/marpora/marpora/releases/tag/v0.3.1')
-  assert.deepEqual(calls.map(args => args.slice(0, 2).join(' ')), ['api repos/marpora/marpora/releases/tags/v0.3.1', 'release create', 'release upload', 'api repos/marpora/marpora/releases/tags/v0.3.1', 'release edit'])
+  assert.deepEqual(calls.map(args => args.slice(0, 2).join(' ')), ['release view', 'release create', 'release view', 'release upload', 'api repos/marpora/marpora/releases/42', 'release edit'])
   assert.ok(calls[1].includes('--draft')); assert.ok(calls.at(-1).includes('--draft=false'))
 })
-test('remote digest mismatch leaves the release draft', t => {
+test('remote digest mismatch leaves an existing draft unpublished', t => {
   const f = fixture(t), files = prepareAssets(f.metadata, f.directory), calls = []
-  const run = args => { calls.push(args); return args[0] === 'api' ? ok({ draft: true, assets: remote(files).map(asset => ({ ...asset, digest: 'sha256:wrong' })) }) : ok() }
+  const run = args => {
+    calls.push(args)
+    if (args[1] === 'view') return ok({ databaseId: 42, isDraft: true })
+    return args[0] === 'api' ? ok({ draft: true, assets: remote(files).map(asset => ({ ...asset, digest: 'sha256:wrong' })) }) : ok()
+  }
   assert.throws(() => publishRelease({ tag: 'v0.3.1', repository: 'marpora/marpora', ...f, run }), /does not match/)
   assert.ok(!calls.some(args => args[1] === 'edit'))
+  assert.ok(!calls.some(args => args[1] === 'create'))
 })
 test('published binaries are never overwritten on rerun', t => {
   const f = fixture(t), files = prepareAssets(f.metadata, f.directory), calls = []
-  const run = args => { calls.push(args); return ok({ draft: false, html_url: 'published', assets: remote(files) }) }
+  const run = args => { calls.push(args); return args[1] === 'view' ? ok({ databaseId: 42, isDraft: false, url: 'published' }) : ok({ assets: remote(files) }) }
   assert.equal(publishRelease({ tag: 'v0.3.1', repository: 'marpora/marpora', ...f, run }), 'published')
-  assert.equal(calls.length, 1)
+  assert.equal(calls.length, 2)
+  assert.ok(calls.every(args => args[1] === 'view' || args[0] === 'api'))
 })
 test('permission/network failures cannot be mistaken for a missing release', t => {
   const f = fixture(t), calls = []
@@ -73,8 +81,13 @@ test('permission/network failures cannot be mistaken for a missing release', t =
 })
 test('prerelease tags stay prereleases and do not replace latest', t => {
   const f = fixture(t, '0.4.0-beta.1'), files = prepareAssets(f.metadata, f.directory), calls = []
-  let reads = 0
-  const run = args => { calls.push(args); return args[0] === 'api' ? (++reads === 1 ? { status: 1, stdout: '', stderr: 'HTTP 404' } : ok({ draft: true, assets: remote(files) })) : ok() }
+  let exists = false
+  const run = args => {
+    calls.push(args)
+    if (args[1] === 'view') return exists ? ok({ databaseId: 42, isDraft: true }) : { status: 1, stdout: '', stderr: 'release not found' }
+    if (args[1] === 'create') exists = true
+    return args[0] === 'api' ? ok({ draft: true, assets: remote(files) }) : ok()
+  }
   publishRelease({ tag: 'v0.4.0-beta.1', repository: 'marpora/marpora', ...f, run })
   assert.ok(calls[1].includes('--prerelease')); assert.ok(calls.at(-1).includes('--latest=false'))
 })
